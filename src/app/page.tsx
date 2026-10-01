@@ -138,7 +138,7 @@ function HomeContent() {
         form.action = data.formData.actionUrl || 'https://secure.payu.in/_payment';
         
         Object.entries(data.formData).forEach(([key, val]) => {
-          if (key !== 'actionUrl' && key !== 'isMock' && val !== undefined && val !== null) {
+          if (key !== 'actionUrl' && val !== undefined && val !== null) {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = key;

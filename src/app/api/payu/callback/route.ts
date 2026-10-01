@@ -39,8 +39,7 @@ export async function POST(req: NextRequest) {
       mihpayid,
       mode,
       bank_ref_num,
-      error_Message,
-      is_mock
+      error_Message
     } = data;
 
     if (!txnid) {
@@ -72,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = (status?.toLowerCase() === 'success' || status?.toLowerCase() === 'captured') && isVerified;
 
-    // Update Neon PostgreSQL DB
+    // Update Neon PostgreSQL DB (Guaranteed UPSERT)
     await updatePaymentStatus(
       txnid,
       isSuccess ? 'SUCCESS' : 'FAILED',
@@ -81,7 +80,13 @@ export async function POST(req: NextRequest) {
         payuHash: hash,
         mode: mode || 'ONLINE',
         bankRefNum: bank_ref_num,
-        errorMessage: isSuccess ? undefined : (error_Message || 'Payment transaction was declined or failed hash verification')
+        errorMessage: isSuccess ? undefined : (error_Message || 'Payment transaction was declined or failed hash verification'),
+        amount: amount ? Number(amount) : undefined,
+        courseName: productinfo || undefined,
+        courseId: udf1 || undefined,
+        studentName: firstname || undefined,
+        email: email || undefined,
+        phone: udf2 || undefined
       }
     );
 

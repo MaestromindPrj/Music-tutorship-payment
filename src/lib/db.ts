@@ -144,9 +144,16 @@ export async function updatePaymentStatus(
     mode?: string;
     bankRefNum?: string;
     errorMessage?: string;
+    amount?: number;
+    courseName?: string;
+    courseId?: string;
+    studentName?: string;
+    email?: string;
+    phone?: string;
   }
 ): Promise<PaymentRecord | null> {
-  const existing = memoryStore.payments.get(txnid);
+  const cleanTxnid = txnid.trim();
+  const existing = memoryStore.payments.get(cleanTxnid);
   if (existing) {
     existing.status = status;
     if (details?.payuId) existing.payuId = details.payuId;
@@ -154,15 +161,22 @@ export async function updatePaymentStatus(
     if (details?.mode) existing.mode = details.mode;
     if (details?.bankRefNum) existing.bankRefNum = details.bankRefNum;
     if (details?.errorMessage) existing.errorMessage = details.errorMessage;
+    if (details?.amount !== undefined) existing.amount = details.amount;
+    if (details?.courseName) existing.courseName = details.courseName;
+    if (details?.courseId) existing.courseId = details.courseId;
+    if (details?.studentName) existing.studentName = details.studentName;
+    if (details?.email) existing.email = details.email;
+    if (details?.phone) existing.phone = details.phone;
     existing.updatedAt = new Date().toISOString();
-    memoryStore.payments.set(txnid, existing);
+    memoryStore.payments.set(cleanTxnid, existing);
   }
 
   const sql = getDb();
   if (sql) {
     try {
       await initDbSchema();
-      const res = await sql`
+      // 1. Try to update existing row
+      const updateRes = await sql`
         UPDATE payments SET
           status = ${status},
           payu_id = COALESCE(${details?.payuId || null}, payu_id),
@@ -171,11 +185,64 @@ export async function updatePaymentStatus(
           bank_ref_num = COALESCE(${details?.bankRefNum || null}, bank_ref_num),
           error_message = COALESCE(${details?.errorMessage || null}, error_message),
           updated_at = NOW()
-        WHERE txnid = ${txnid}
+        WHERE LOWER(TRIM(txnid)) = LOWER(${cleanTxnid})
         RETURNING *;
       `;
-      if (res && res.length > 0) {
-        const row = res[0];
+      if (updateRes && updateRes.length > 0) {
+        const row = updateRes[0];
+        return {
+          id: row.id,
+          txnid: row.txnid,
+          amount: Number(row.amount),
+          courseName: row.course_name,
+          courseId: row.course_id,
+          studentName: row.student_name,
+          email: row.email,
+          phone: row.phone,
+          status: row.status,
+          payuId: row.payu_id,
+          payuHash: row.payu_hash,
+          mode: row.mode,
+          bankRefNum: row.bank_ref_num,
+          errorMessage: row.error_message,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
+        };
+      }
+
+      // 2. If row was not present (e.g. server restarted or async initiate disconnect), UPSERT from callback data
+      const insertRes = await sql`
+        INSERT INTO payments (
+          txnid, amount, course_name, course_id, student_name, email, phone, status, payu_id, payu_hash, mode, bank_ref_num, error_message, created_at, updated_at
+        ) VALUES (
+          ${cleanTxnid},
+          ${details?.amount || 1},
+          ${details?.courseName || 'Complete Music Production Mastery Course'},
+          ${details?.courseId || 'mastery'},
+          ${details?.studentName || 'Student'},
+          ${details?.email || ''},
+          ${details?.phone || ''},
+          ${status},
+          ${details?.payuId || null},
+          ${details?.payuHash || null},
+          ${details?.mode || null},
+          ${details?.bankRefNum || null},
+          ${details?.errorMessage || null},
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (txnid) DO UPDATE SET
+          status = EXCLUDED.status,
+          payu_id = EXCLUDED.payu_id,
+          payu_hash = EXCLUDED.payu_hash,
+          mode = EXCLUDED.mode,
+          bank_ref_num = EXCLUDED.bank_ref_num,
+          error_message = EXCLUDED.error_message,
+          updated_at = NOW()
+        RETURNING *;
+      `;
+      if (insertRes && insertRes.length > 0) {
+        const row = insertRes[0];
         return {
           id: row.id,
           txnid: row.txnid,
@@ -204,11 +271,14 @@ export async function updatePaymentStatus(
 }
 
 export async function getPaymentByTxnId(txnid: string): Promise<PaymentRecord | null> {
+  const cleanTxnid = txnid ? txnid.trim() : '';
+  if (!cleanTxnid) return null;
+
   const sql = getDb();
   if (sql) {
     try {
       await initDbSchema();
-      const res = await sql`SELECT * FROM payments WHERE txnid = ${txnid} LIMIT 1;`;
+      const res = await sql`SELECT * FROM payments WHERE LOWER(TRIM(txnid)) = LOWER(${cleanTxnid}) LIMIT 1;`;
       if (res && res.length > 0) {
         const row = res[0];
         return {
@@ -235,7 +305,7 @@ export async function getPaymentByTxnId(txnid: string): Promise<PaymentRecord | 
     }
   }
 
-  return memoryStore.payments.get(txnid) || null;
+  return memoryStore.payments.get(cleanTxnid) || null;
 }
 
 // Student Registration KYC operations (strictly 9 fields)

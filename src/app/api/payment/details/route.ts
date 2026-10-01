@@ -4,11 +4,12 @@ import { getCourseById } from '@/lib/courses';
 
 export async function GET(req: NextRequest) {
   try {
-    const txnid = req.nextUrl.searchParams.get('txnid');
-    if (!txnid) {
+    const rawTxnid = req.nextUrl.searchParams.get('txnid');
+    if (!rawTxnid || !rawTxnid.trim()) {
       return NextResponse.json({ error: 'Missing txnid parameter' }, { status: 400 });
     }
 
+    const txnid = rawTxnid.trim();
     const payment = await getPaymentByTxnId(txnid);
     if (!payment) {
       return NextResponse.json({ error: 'Payment transaction not found' }, { status: 404 });

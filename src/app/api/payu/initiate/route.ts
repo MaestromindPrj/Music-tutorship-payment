@@ -6,8 +6,8 @@ import { PayUInitiatePayload, PayUFormData } from '@/types';
 
 export async function POST(req: NextRequest) {
   try {
-    const body: PayUInitiatePayload & { mockGateway?: boolean } = await req.json();
-    const { courseId, customAmount, studentName, email, phone, notes, mockGateway } = body;
+    const body: PayUInitiatePayload = await req.json();
+    const { courseId, customAmount, studentName, email, phone, notes } = body;
 
     if (!studentName || !email || !phone) {
       return NextResponse.json(
@@ -79,8 +79,7 @@ export async function POST(req: NextRequest) {
       udf4: '',
       udf5: '',
       hash,
-      actionUrl,
-      isMock: false
+      actionUrl
     };
 
     return NextResponse.json({

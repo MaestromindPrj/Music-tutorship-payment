@@ -74,5 +74,4 @@ export interface PayUFormData {
   udf5: string;
   hash: string;
   actionUrl: string;
-  isMock?: boolean;
 }
