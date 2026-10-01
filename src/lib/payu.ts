@@ -19,7 +19,7 @@ export function getPayUConfig(): PayUConfig {
   // Production PayU Credentials
   const merchantKey = process.env.PAYU_MERCHANT_KEY || 'kBVBg7';
   const merchantSalt = process.env.PAYU_MERCHANT_SALT || '9ymk3c7nXHs94Brh3VQ4wGUaPctkvYgq';
-  const merchantMid = process.env.PAYU_MERCHANT_MID || '13041074';
+  const merchantMid = process.env.PAYU_MERCHANT_MID || process.env.PAYU_MERCHANT_ID || '13041074';
 
   // PayU Production Endpoint
   const paymentUrl = process.env.PAYU_PAYMENT_URL || 'https://secure.payu.in/_payment';
