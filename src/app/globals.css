@@ -361,15 +361,6 @@ h1, h2, h3, h4, h5, h6 {
     padding: 6px 8px !important;
   }
   
-  .stat-divider {
-    display: none !important;
-  }
-  
-  .stats-bar {
-    gap: 10px 16px !important;
-    padding: 8px 14px !important;
-  }
-
   .header-cta-btn {
     padding: 10px 16px !important;
     font-size: 11px !important;

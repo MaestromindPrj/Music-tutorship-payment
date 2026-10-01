@@ -9,7 +9,7 @@ export default function Footer() {
     <footer style={{
       backgroundColor: '#000000',
       color: '#ffffff',
-      padding: '72px 0 36px 0',
+      padding: '56px 0 32px 0',
       marginTop: '60px',
       fontFamily: 'var(--font-family)'
     }} id="footer-contact">
@@ -17,28 +17,29 @@ export default function Footer() {
         {/* Top Grid Section */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '48px',
-          marginBottom: '56px'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '40px',
+          marginBottom: '40px'
         }}>
           {/* Column 1: Brand & Receipt CTA */}
           <div>
             <h3 style={{
-              fontSize: '20px',
+              fontSize: '18px',
               fontWeight: 700,
               color: '#ffffff',
-              marginBottom: '16px',
+              marginBottom: '12px',
               letterSpacing: '-0.01em'
             }}>
               Music Tutorship
             </h3>
             <p style={{
-              fontSize: '14px',
+              fontSize: '13px',
               color: '#9ca3af',
-              lineHeight: 1.7,
-              marginBottom: '24px'
+              lineHeight: 1.6,
+              marginBottom: '20px',
+              maxWidth: '380px'
             }}>
-              Elevate your music production journey with personalized mentorship and comprehensive courses designed to unlock your creative potential.
+              Official course fee payment and student registration portal for Music Tutorship programs.
             </p>
             <Link
               href="/lookup"
@@ -48,9 +49,9 @@ export default function Footer() {
                 gap: '8px',
                 backgroundColor: '#ffffff',
                 color: '#000000',
-                padding: '12px 22px',
-                fontSize: '12px',
-                fontWeight: 500,
+                padding: '10px 20px',
+                fontSize: '11px',
+                fontWeight: 600,
                 letterSpacing: '0.8px',
                 textTransform: 'uppercase',
                 textDecoration: 'none',
@@ -60,71 +61,40 @@ export default function Footer() {
               onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#e5e7eb'; }}
               onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff'; }}
             >
-              <Search size={14} />
+              <Search size={13} />
               <span>RECEIPT LOOKUP</span>
             </Link>
           </div>
 
-          {/* Column 2: Our Courses */}
+          {/* Column 2: Contact Info */}
           <div>
             <h4 style={{
-              fontSize: '12px',
+              fontSize: '11px',
               fontWeight: 700,
               letterSpacing: '2px',
               textTransform: 'uppercase',
               color: '#9ca3af',
-              marginBottom: '24px'
+              marginBottom: '18px'
             }}>
-              OUR COURSES
+              CONTACT & LOCATION
             </h4>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '14px', padding: 0, margin: 0 }}>
-              <li>
-                <Link href="/" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}>
-                  Complete Music Production Mastery Course
-                </Link>
-              </li>
-              <li>
-                <Link href="/" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}>
-                  Producer Transformation Path
-                </Link>
-              </li>
-              <li>
-                <Link href="/" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}>
-                  One-on-One Music Production Mentorship
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 3: Contact Info */}
-          <div>
-            <h4 style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              color: '#9ca3af',
-              marginBottom: '24px'
-            }}>
-              CONTACT INFO
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '14px', color: '#d1d5db' }}>
-                <Mail size={17} style={{ color: '#ffffff', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#d1d5db' }}>
+                <Mail size={15} style={{ color: '#ffffff', flexShrink: 0, marginTop: '2px' }} />
                 <a href="mailto:info@musictutorship.in" style={{ color: '#d1d5db', textDecoration: 'none' }}>
                   info@musictutorship.in
                 </a>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '14px', color: '#d1d5db' }}>
-                <Phone size={17} style={{ color: '#ffffff', flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#d1d5db' }}>
+                <Phone size={15} style={{ color: '#ffffff', flexShrink: 0, marginTop: '2px' }} />
                 <a href="tel:+916374428173" style={{ color: '#d1d5db', textDecoration: 'none' }}>
                   +91 63744 28173
                 </a>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '13px', color: '#9ca3af', lineHeight: 1.6 }}>
-                <MapPin size={17} style={{ color: '#ffffff', flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '12px', color: '#9ca3af', lineHeight: 1.5 }}>
+                <MapPin size={15} style={{ color: '#ffffff', flexShrink: 0, marginTop: '2px' }} />
                 <span>
                   TVH Beliciaa Towers, Tower 2, 6th floor,<br />
                   71/4(71/4), Raja Annamalai Puram,<br />
@@ -138,13 +108,13 @@ export default function Footer() {
         {/* Bottom Bar Divider */}
         <div style={{
           borderTop: '1px solid #1f2937',
-          paddingTop: '28px',
+          paddingTop: '24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '16px',
-          fontSize: '12px',
+          gap: '14px',
+          fontSize: '11px',
           color: '#6b7280',
           letterSpacing: '0.5px'
         }}>
@@ -152,7 +122,7 @@ export default function Footer() {
             © 2026 MUSIC TUTORSHIP. ALL RIGHTS RESERVED.
           </div>
 
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
             <a
               href="https://www.musictutorship.in/privacy-policy"
               target="_blank"

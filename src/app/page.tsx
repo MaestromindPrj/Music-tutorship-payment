@@ -1,17 +1,10 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
-import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
-  ShieldCheck,
-  CheckCircle2,
   Lock,
   ArrowRight,
-  Music,
-  Star,
-  Users,
   ChevronDown,
   ChevronUp,
   AlertCircle,
@@ -19,8 +12,66 @@ import {
 } from 'lucide-react';
 import { COURSES, getCourseById } from '@/lib/courses';
 
+function getFriendlyErrorMessage(rawError?: string | null): string {
+  if (!rawError) {
+    return 'Payment was not completed. Please try again.';
+  }
+  const lower = rawError.toLowerCase();
+
+  if (
+    lower.includes('cancel') ||
+    lower.includes('cancelled') ||
+    lower.includes('closed') ||
+    lower.includes('aborted') ||
+    lower.includes('back button')
+  ) {
+    return 'Payment was cancelled. You can retry anytime whenever you are ready.';
+  }
+  if (
+    lower.includes('decline') ||
+    lower.includes('insufficient') ||
+    lower.includes('do not honor') ||
+    lower.includes('limit') ||
+    lower.includes('card')
+  ) {
+    return 'Payment was declined by the bank. Please try again or use another payment method.';
+  }
+  if (
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('expired') ||
+    lower.includes('session')
+  ) {
+    return 'Payment session expired. Please initiate a new transaction.';
+  }
+  if (
+    lower.includes('otp') ||
+    lower.includes('auth') ||
+    lower.includes('authentication')
+  ) {
+    return 'Authentication failed. Please verify your OTP or bank security details and try again.';
+  }
+  if (
+    lower.includes('network') ||
+    lower.includes('connection') ||
+    lower.includes('gateway')
+  ) {
+    return 'Unable to establish a secure connection with the bank gateway. Please try again.';
+  }
+  if (
+    lower.includes('customer') ||
+    lower.includes('error_message') ||
+    lower.includes('txnid')
+  ) {
+    return 'Payment could not be completed. Please try again.';
+  }
+
+  return rawError.length > 80
+    ? 'Payment was not completed. Please try again.'
+    : rawError;
+}
+
 function HomeContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [selectedCourseId, setSelectedCourseId] = useState<string>('mastery');
@@ -123,14 +174,14 @@ function HomeContent() {
     },
     {
       q: 'Will I receive an official invoice and admission receipt?',
-      a: 'Yes. Instantly after payment and registration, you will receive an official admission receipt with your unique Order ID, downloadable for your records.'
+      a: 'Yes. Instantly after payment and registration, you will receive an official admission receipt with your unique Order ID, downloadable and printable for your records.'
     }
   ];
 
   return (
     <div style={{ paddingBottom: '60px' }}>
       {/* Alert Banner for Payment Failure */}
-      {statusParam === 'failed' && (
+      {(statusParam === 'failed' || statusParam === 'error') && (
         <div style={{
           backgroundColor: 'rgba(185, 28, 28, 0.08)',
           border: 'none',
@@ -144,61 +195,26 @@ function HomeContent() {
           gap: '8px'
         }}>
           <AlertCircle size={16} />
-          <span>
-            Payment was not completed: <strong>{errorParam || 'Declined by bank'}</strong>. Please try again.
-          </span>
+          <span>{getFriendlyErrorMessage(errorParam)}</span>
         </div>
       )}
 
       {/* Hero Section */}
-      <section style={{ padding: '48px 0 32px 0', textAlign: 'center' }}>
+      <section style={{ padding: '40px 0 24px 0', textAlign: 'center' }}>
         <div className="container">
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
             <span className="section-overline">
-              OFFICIAL ENROLLMENT PORTAL
+              OFFICIAL ENROLLMENT & PAYMENT PORTAL
             </span>
           </div>
 
-          <h1 className="section-title" style={{ maxWidth: '800px', margin: '0 auto 14px auto' }}>
-            Music Tutorship Course Enrollment & Payments
+          <h1 className="section-title" style={{ maxWidth: '800px', margin: '0 auto 12px auto' }}>
+            Music Tutorship Course Fee Payment
           </h1>
 
-          <p className="section-desc" style={{ margin: '0 auto 28px auto' }}>
-            Learn music production from mentor Vijay. Complete your fee payment with instant receipt and batch onboarding.
+          <p className="section-desc" style={{ margin: '0 auto 8px auto', maxWidth: '640px' }}>
+            Select your enrolled program below to proceed to secure fee payment and student registration.
           </p>
-
-          {/* Quick Stats Bar */}
-          <div className="stats-bar" style={{
-            display: 'inline-flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '16px 24px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #e2e8f0',
-            padding: '10px 24px',
-            borderRadius: '0px',
-            marginBottom: '36px',
-            maxWidth: '100%'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Star size={15} color="#000000" strokeWidth={2} />
-              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>4.9/5</span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>Rating</span>
-            </div>
-            <div className="stat-divider" style={{ width: '1px', height: '14px', backgroundColor: '#e2e8f0' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Users size={15} style={{ color: '#000000' }} />
-              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>300+</span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>Students</span>
-            </div>
-            <div className="stat-divider" style={{ width: '1px', height: '14px', backgroundColor: '#e2e8f0' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Music size={15} style={{ color: '#000000' }} />
-              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>60M+</span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>Streams</span>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -484,124 +500,8 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* Meet Your Mentor Spotlight Section */}
-      <section id="mentor-section" style={{ padding: '60px 0 40px 0', borderTop: '1px solid #e2e8f0', marginTop: '60px' }}>
-        <div className="container">
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '40px',
-            alignItems: 'center'
-          }}>
-            {/* Mentor Image */}
-            <div style={{ position: 'relative', maxWidth: '380px', margin: '0 auto' }}>
-              <div style={{
-                borderRadius: '0px',
-                overflow: 'hidden',
-                border: '1px solid #cbd5e1'
-              }}>
-                <Image
-                  src="/images/mentor.jpeg"
-                  alt="Mentor Vijay"
-                  width={380}
-                  height={380}
-                  style={{ width: '100%', height: 'auto', objectFit: 'cover', display: 'block' }}
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Mentor Bio */}
-            <div>
-              <span className="section-overline">EXPERT GUIDANCE FOR YOUR JOURNEY</span>
-              <h2 style={{ fontSize: '30px', fontWeight: 800, color: '#0f172a', marginBottom: '14px' }}>
-                Meet Your Mentor, <span style={{ color: '#e2b13c' }}>Vijay</span>
-              </h2>
-              <p style={{ color: '#475569', fontSize: '14px', lineHeight: 1.7, marginBottom: '20px' }}>
-                With over a decade of experience in music production, I&apos;ve dedicated my career to helping aspiring musicians unlock their creative potential. My journey spans working with renowned artists, producing tracks that have reached millions, and mentoring hundreds of students who&apos;ve built successful music careers.
-              </p>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                <div className="clean-card" style={{ padding: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#e2b13c' }}>10+</div>
-                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>Years Exp</div>
-                </div>
-                <div className="clean-card" style={{ padding: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#e2b13c' }}>300+</div>
-                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>Students</div>
-                </div>
-                <div className="clean-card" style={{ padding: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>60M+</div>
-                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>Streams</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="container" style={{ padding: '40px 24px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <span className="section-overline">GRADUATE FEEDBACK</span>
-          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a' }}>Hear from Our Students</h2>
-        </div>
-
-        <div className="grid-3">
-          <div className="clean-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', gap: '3px', color: '#d97706', marginBottom: '10px' }}>
-              {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="#d97706" />)}
-            </div>
-            <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6, marginBottom: '16px' }}>
-              &ldquo;I’ve already started producing my tracks with more confidence and Mr. Vijay gave us excellent mentoring from how to structure the composition to producing it.&rdquo;
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#fef9ee', color: '#b8871b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px' }}>E</div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Ela Maran</div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Batch 2B Graduate</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="clean-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', gap: '3px', color: '#d97706', marginBottom: '10px' }}>
-              {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="#d97706" />)}
-            </div>
-            <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6, marginBottom: '16px' }}>
-              &ldquo;Being a businessman with a deep passion for music, Vijay helped me out with all the music production essentials and he guided me on the right path.&rdquo;
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#fef9ee', color: '#b8871b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px' }}>F</div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Fredrick</div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Batch 2B Graduate</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="clean-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', gap: '3px', color: '#d97706', marginBottom: '10px' }}>
-              {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="#d97706" />)}
-            </div>
-            <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6, marginBottom: '16px' }}>
-              &ldquo;We had a most interesting learning experience in Music tutorship under guidance of Vijay sir. He gave us a proper roadmap customised for our goals.&rdquo;
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#fef9ee', color: '#b8871b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px' }}>S</div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Sarwina</div>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Personalised Mentorship</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ Section */}
-      <section className="container" style={{ padding: '32px 24px' }}>
+      <section className="container" style={{ padding: '48px 24px 16px 24px' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <span className="section-overline">QUESTIONS & ANSWERS</span>

@@ -16,7 +16,7 @@ export const COURSES: Course[] = [
       'Logic Pro X & Ableton Live Deep Dive',
       'Advanced Audio Mixing & Sound Design',
       'Industry Standard Mastering Workflows',
-      'Weekly Live Mentorship Sessions with Vijay',
+      'Weekly Live Mentorship Sessions',
       'Certificate of Completion & Portfolio Review',
       'Lifetime Access to Exclusive Alumni Network'
     ]
@@ -55,7 +55,7 @@ export const COURSES: Course[] = [
     features: [
       '100% Tailored Curriculum to Your Musical Goals',
       'Flexible Session Timings (Weekdays / Weekends)',
-      'Dedicated Studio Sessions with Mentor Vijay',
+      'Dedicated 1-on-1 Studio Mentorship Sessions',
       'Complete Co-Production on Your Original Tracks',
       'Vocal Tuning, Mixing Stems, & Master File Polish',
       'Industry Networking & Artist Career Roadmap',

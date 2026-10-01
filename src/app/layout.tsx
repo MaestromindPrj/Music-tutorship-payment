@@ -14,13 +14,13 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://payments.musictutorship.in'),
   title: 'Music Tutorship | Official Course Payment Portal',
-  description: 'Secure course fee payments, enrollment and registration for Music Tutorship programs by Vijay.',
+  description: 'Official fee payment and student enrollment portal for Music Tutorship programs.',
   icons: {
     icon: '/images/logo.png',
   },
   openGraph: {
     title: 'Music Tutorship | Official Course Payment Portal',
-    description: 'Learn music production from mentor Vijay. Secure online payment & instant batch enrollment.',
+    description: 'Official fee payment and student enrollment portal for Music Tutorship programs.',
     url: 'https://payments.musictutorship.in',
     siteName: 'Music Tutorship Payments',
     images: [
