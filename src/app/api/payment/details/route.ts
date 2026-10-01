@@ -17,9 +17,12 @@ export async function GET(req: NextRequest) {
     const registration = await getRegistrationByTxnId(txnid);
     const course = getCourseById(payment.courseId);
 
+    // Omit internal cryptographic hashes for security
+    const { payuHash, ...safePayment } = payment;
+
     return NextResponse.json({
       success: true,
-      payment,
+      payment: safePayment,
       registration,
       course
     });
