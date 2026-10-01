@@ -115,9 +115,19 @@ export default function LookupPage() {
                   fontWeight: 700,
                   padding: '4px 8px',
                   borderRadius: '0px',
-                  backgroundColor: result.payment.status === 'SUCCESS' ? 'rgba(21, 128, 61, 0.10)' : 'rgba(185, 28, 28, 0.10)',
+                  backgroundColor:
+                    result.payment.status === 'SUCCESS'
+                      ? 'rgba(21, 128, 61, 0.10)'
+                      : result.payment.status === 'PENDING'
+                      ? 'rgba(217, 119, 6, 0.10)'
+                      : 'rgba(185, 28, 28, 0.10)',
                   border: 'none',
-                  color: result.payment.status === 'SUCCESS' ? '#15803d' : '#b91c1c',
+                  color:
+                    result.payment.status === 'SUCCESS'
+                      ? '#15803d'
+                      : result.payment.status === 'PENDING'
+                      ? '#b45309'
+                      : '#b91c1c',
                   letterSpacing: '0.5px'
                 }}>
                   {result.payment.status}
@@ -132,7 +142,9 @@ export default function LookupPage() {
             </div>
 
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>Amount Paid</div>
+              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                {result.payment.status === 'SUCCESS' ? 'Amount Paid' : 'Course Fee'}
+              </div>
               <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
                 ₹{Number(result.payment.amount).toLocaleString('en-IN')}
               </div>
