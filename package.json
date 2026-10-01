@@ -9,11 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@neon/config": "^1.8.3",
+    "@neondatabase/serverless": "^1.1.0",
+    "canvas-confetti": "^1.9.4",
+    "lucide-react": "^1.49.0",
     "next": "16.3.7",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
