@@ -51,7 +51,7 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Right CTA Button: Receipt Lookup */}
+    
         <div>
           <Link
             href="/lookup"
