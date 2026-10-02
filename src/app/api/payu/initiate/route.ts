@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const txnid = generateTxnId();
     const courseName = course ? course.title : 'Music Production Course Fee';
 
-    // Save pending record in Neon PostgreSQL
+    // Save initial transaction record to Google Sheets & memory cache
     await savePayment({
       txnid,
       amount,

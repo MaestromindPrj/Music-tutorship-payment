@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = (status?.toLowerCase() === 'success' || status?.toLowerCase() === 'captured') && isVerified;
 
-    // Update Neon PostgreSQL DB (Guaranteed UPSERT)
+    // Update Google Sheets & cache with verified transaction status
     await updatePaymentStatus(
       txnid,
       isSuccess ? 'SUCCESS' : 'FAILED',

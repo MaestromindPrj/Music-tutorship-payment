@@ -1,136 +1,37 @@
-import { neon } from '@neondatabase/serverless';
 import { PaymentRecord, StudentRegistration } from '@/types';
+import {
+  savePaymentToSheets,
+  updatePaymentStatusInSheets,
+  getPaymentFromSheets,
+  saveRegistrationToSheets,
+  getRegistrationFromSheets
+} from './sheets';
 
-// In-memory fallback store for development or testing
+// In-memory cache store for high-speed sub-millisecond response
 const memoryStore = {
   payments: new Map<string, PaymentRecord>(),
   registrations: new Map<string, StudentRegistration>()
 };
 
-function getDb() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl || databaseUrl.trim() === '') {
-    return null;
-  }
-  try {
-    return neon(databaseUrl);
-  } catch (err) {
-    console.warn('Failed to initialize Neon client:', err);
-    return null;
-  }
-}
+// =========================================================================
+// Payment Operations (100% Google Sheets Storage + In-Memory Cache)
+// =========================================================================
 
-// Ensure database tables exist in Neon PostgreSQL
-let tablesInitialized = false;
-export async function initDbSchema() {
-  if (tablesInitialized) return;
-  const sql = getDb();
-  if (!sql) return;
-
-  try {
-    // 1. Payments table
-    await sql`
-      CREATE TABLE IF NOT EXISTS payments (
-        id SERIAL PRIMARY KEY,
-        txnid VARCHAR(64) UNIQUE NOT NULL,
-        amount NUMERIC(10, 2) NOT NULL,
-        course_name VARCHAR(255) NOT NULL,
-        course_id VARCHAR(64) NOT NULL,
-        student_name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        phone VARCHAR(32) NOT NULL,
-        status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-        payu_id VARCHAR(128),
-        payu_hash TEXT,
-        mode VARCHAR(64),
-        bank_ref_num VARCHAR(128),
-        error_message TEXT,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `;
-
-    // 2. Student Registrations table with strictly 9 KYC fields
-    await sql`
-      CREATE TABLE IF NOT EXISTS student_registrations (
-        id SERIAL PRIMARY KEY,
-        txnid VARCHAR(64) UNIQUE NOT NULL,
-        full_name VARCHAR(255) NOT NULL,
-        dob DATE NOT NULL,
-        address TEXT NOT NULL,
-        aadhar_card VARCHAR(20) NOT NULL,
-        gender VARCHAR(32) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        phone VARCHAR(32) NOT NULL,
-        pan VARCHAR(20) NOT NULL,
-        occupation VARCHAR(128) NOT NULL,
-        submitted_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `;
-
-    tablesInitialized = true;
-  } catch (error) {
-    console.error('Error initializing Neon database schema:', error);
-  }
-}
-
-// Payment operations
 export async function savePayment(record: Omit<PaymentRecord, 'id'>): Promise<PaymentRecord> {
-  const sql = getDb();
-  
+  const cleanTxnid = record.txnid.trim();
   const savedRecord: PaymentRecord = {
     ...record,
+    txnid: cleanTxnid,
     id: `pay_${Date.now()}`
   };
-  memoryStore.payments.set(record.txnid, savedRecord);
 
-  if (sql) {
-    try {
-      await initDbSchema();
-      const res = await sql`
-        INSERT INTO payments (
-          txnid, amount, course_name, course_id, student_name, email, phone, status, payu_id, payu_hash, mode, bank_ref_num, error_message, created_at, updated_at
-        ) VALUES (
-          ${record.txnid}, ${record.amount}, ${record.courseName}, ${record.courseId}, 
-          ${record.studentName}, ${record.email}, ${record.phone}, ${record.status}, 
-          ${record.payuId || null}, ${record.payuHash || null}, ${record.mode || null}, 
-          ${record.bankRefNum || null}, ${record.errorMessage || null}, NOW(), NOW()
-        )
-        ON CONFLICT (txnid) DO UPDATE SET
-          status = EXCLUDED.status,
-          payu_id = EXCLUDED.payu_id,
-          payu_hash = EXCLUDED.payu_hash,
-          mode = EXCLUDED.mode,
-          bank_ref_num = EXCLUDED.bank_ref_num,
-          error_message = EXCLUDED.error_message,
-          updated_at = NOW()
-        RETURNING *;
-      `;
-      if (res && res.length > 0) {
-        const row = res[0];
-        return {
-          id: row.id,
-          txnid: row.txnid,
-          amount: Number(row.amount),
-          courseName: row.course_name,
-          courseId: row.course_id,
-          studentName: row.student_name,
-          email: row.email,
-          phone: row.phone,
-          status: row.status,
-          payuId: row.payu_id,
-          payuHash: row.payu_hash,
-          mode: row.mode,
-          bankRefNum: row.bank_ref_num,
-          errorMessage: row.error_message,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
-        };
-      }
-    } catch (err) {
-      console.error('Neon DB savePayment error:', err);
-    }
-  }
+  // 1. Save in fast cache
+  memoryStore.payments.set(cleanTxnid, savedRecord);
+
+  // 2. Persist to Google Sheets
+  await savePaymentToSheets(savedRecord).catch((e) =>
+    console.warn('Google Sheets savePayment note:', e)
+  );
 
   return savedRecord;
 }
@@ -153,7 +54,11 @@ export async function updatePaymentStatus(
   }
 ): Promise<PaymentRecord | null> {
   const cleanTxnid = txnid.trim();
+
+  // 1. Update in-memory cache
   const existing = memoryStore.payments.get(cleanTxnid);
+  let updatedRecord: PaymentRecord;
+
   if (existing) {
     existing.status = status;
     if (details?.payuId) existing.payuId = details.payuId;
@@ -169,232 +74,93 @@ export async function updatePaymentStatus(
     if (details?.phone) existing.phone = details.phone;
     existing.updatedAt = new Date().toISOString();
     memoryStore.payments.set(cleanTxnid, existing);
+    updatedRecord = existing;
+  } else {
+    updatedRecord = {
+      txnid: cleanTxnid,
+      amount: details?.amount || 1,
+      courseName: details?.courseName || 'Complete Music Production Mastery Course',
+      courseId: details?.courseId || 'mastery',
+      studentName: details?.studentName || 'Student',
+      email: details?.email || '',
+      phone: details?.phone || '',
+      status,
+      payuId: details?.payuId,
+      payuHash: details?.payuHash,
+      mode: details?.mode,
+      bankRefNum: details?.bankRefNum,
+      errorMessage: details?.errorMessage,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    memoryStore.payments.set(cleanTxnid, updatedRecord);
   }
 
-  const sql = getDb();
-  if (sql) {
-    try {
-      await initDbSchema();
-      // 1. Try to update existing row
-      const updateRes = await sql`
-        UPDATE payments SET
-          status = ${status},
-          payu_id = COALESCE(${details?.payuId || null}, payu_id),
-          payu_hash = COALESCE(${details?.payuHash || null}, payu_hash),
-          mode = COALESCE(${details?.mode || null}, mode),
-          bank_ref_num = COALESCE(${details?.bankRefNum || null}, bank_ref_num),
-          error_message = COALESCE(${details?.errorMessage || null}, error_message),
-          updated_at = NOW()
-        WHERE LOWER(TRIM(txnid)) = LOWER(${cleanTxnid})
-        RETURNING *;
-      `;
-      if (updateRes && updateRes.length > 0) {
-        const row = updateRes[0];
-        return {
-          id: row.id,
-          txnid: row.txnid,
-          amount: Number(row.amount),
-          courseName: row.course_name,
-          courseId: row.course_id,
-          studentName: row.student_name,
-          email: row.email,
-          phone: row.phone,
-          status: row.status,
-          payuId: row.payu_id,
-          payuHash: row.payu_hash,
-          mode: row.mode,
-          bankRefNum: row.bank_ref_num,
-          errorMessage: row.error_message,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
-        };
-      }
+  // 2. Persist update to Google Sheets
+  await updatePaymentStatusInSheets(cleanTxnid, status, details).catch((e) =>
+    console.warn('Google Sheets updatePaymentStatus note:', e)
+  );
 
-      // 2. If row was not present (e.g. server restarted or async initiate disconnect), UPSERT from callback data
-      const insertRes = await sql`
-        INSERT INTO payments (
-          txnid, amount, course_name, course_id, student_name, email, phone, status, payu_id, payu_hash, mode, bank_ref_num, error_message, created_at, updated_at
-        ) VALUES (
-          ${cleanTxnid},
-          ${details?.amount || 1},
-          ${details?.courseName || 'Complete Music Production Mastery Course'},
-          ${details?.courseId || 'mastery'},
-          ${details?.studentName || 'Student'},
-          ${details?.email || ''},
-          ${details?.phone || ''},
-          ${status},
-          ${details?.payuId || null},
-          ${details?.payuHash || null},
-          ${details?.mode || null},
-          ${details?.bankRefNum || null},
-          ${details?.errorMessage || null},
-          NOW(),
-          NOW()
-        )
-        ON CONFLICT (txnid) DO UPDATE SET
-          status = EXCLUDED.status,
-          payu_id = EXCLUDED.payu_id,
-          payu_hash = EXCLUDED.payu_hash,
-          mode = EXCLUDED.mode,
-          bank_ref_num = EXCLUDED.bank_ref_num,
-          error_message = EXCLUDED.error_message,
-          updated_at = NOW()
-        RETURNING *;
-      `;
-      if (insertRes && insertRes.length > 0) {
-        const row = insertRes[0];
-        return {
-          id: row.id,
-          txnid: row.txnid,
-          amount: Number(row.amount),
-          courseName: row.course_name,
-          courseId: row.course_id,
-          studentName: row.student_name,
-          email: row.email,
-          phone: row.phone,
-          status: row.status,
-          payuId: row.payu_id,
-          payuHash: row.payu_hash,
-          mode: row.mode,
-          bankRefNum: row.bank_ref_num,
-          errorMessage: row.error_message,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
-        };
-      }
-    } catch (err) {
-      console.error('Neon DB updatePaymentStatus error:', err);
-    }
-  }
-
-  return existing || null;
+  return updatedRecord;
 }
 
 export async function getPaymentByTxnId(txnid: string): Promise<PaymentRecord | null> {
   const cleanTxnid = txnid ? txnid.trim() : '';
   if (!cleanTxnid) return null;
 
-  const sql = getDb();
-  if (sql) {
-    try {
-      await initDbSchema();
-      const res = await sql`SELECT * FROM payments WHERE LOWER(TRIM(txnid)) = LOWER(${cleanTxnid}) LIMIT 1;`;
-      if (res && res.length > 0) {
-        const row = res[0];
-        return {
-          id: row.id,
-          txnid: row.txnid,
-          amount: Number(row.amount),
-          courseName: row.course_name,
-          courseId: row.course_id,
-          studentName: row.student_name,
-          email: row.email,
-          phone: row.phone,
-          status: row.status,
-          payuId: row.payu_id,
-          payuHash: row.payu_hash,
-          mode: row.mode,
-          bankRefNum: row.bank_ref_num,
-          errorMessage: row.error_message,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
-        };
-      }
-    } catch (err) {
-      console.error('Neon DB getPaymentByTxnId error:', err);
-    }
+  // 1. Check in-memory cache
+  const cached = memoryStore.payments.get(cleanTxnid);
+  if (cached) return cached;
+
+  // 2. Query Google Sheets
+  const sheetPayment = await getPaymentFromSheets(cleanTxnid);
+  if (sheetPayment) {
+    memoryStore.payments.set(cleanTxnid, sheetPayment);
+    return sheetPayment;
   }
 
-  return memoryStore.payments.get(cleanTxnid) || null;
+  return null;
 }
 
-// Student Registration KYC operations (strictly 9 fields)
+// =========================================================================
+// Student Registration KYC Operations (Strictly 9 Fields)
+// =========================================================================
+
 export async function saveStudentRegistration(
   reg: Omit<StudentRegistration, 'id'>
 ): Promise<StudentRegistration> {
-  const sql = getDb();
-
+  const cleanTxnid = reg.txnid.trim();
   const savedReg: StudentRegistration = {
     ...reg,
+    txnid: cleanTxnid,
     id: `reg_${Date.now()}`
   };
-  memoryStore.registrations.set(reg.txnid, savedReg);
 
-  if (sql) {
-    try {
-      await initDbSchema();
-      const res = await sql`
-        INSERT INTO student_registrations (
-          txnid, full_name, dob, address, aadhar_card, gender, email, phone, pan, occupation, submitted_at
-        ) VALUES (
-          ${reg.txnid}, ${reg.fullName}, ${reg.dob}, ${reg.address}, ${reg.aadharCard},
-          ${reg.gender}, ${reg.email}, ${reg.phone}, ${reg.pan}, ${reg.occupation}, NOW()
-        )
-        ON CONFLICT (txnid) DO UPDATE SET
-          full_name = EXCLUDED.full_name,
-          dob = EXCLUDED.dob,
-          address = EXCLUDED.address,
-          aadhar_card = EXCLUDED.aadhar_card,
-          gender = EXCLUDED.gender,
-          email = EXCLUDED.email,
-          phone = EXCLUDED.phone,
-          pan = EXCLUDED.pan,
-          occupation = EXCLUDED.occupation,
-          submitted_at = NOW()
-        RETURNING *;
-      `;
-      if (res && res.length > 0) {
-        const row = res[0];
-        return {
-          id: row.id,
-          txnid: row.txnid,
-          fullName: row.full_name,
-          dob: row.dob,
-          address: row.address,
-          aadharCard: row.aadhar_card,
-          gender: row.gender,
-          email: row.email,
-          phone: row.phone,
-          pan: row.pan,
-          occupation: row.occupation,
-          submittedAt: row.submitted_at
-        };
-      }
-    } catch (err) {
-      console.error('Neon DB saveStudentRegistration error:', err);
-    }
-  }
+  // 1. Save in fast cache
+  memoryStore.registrations.set(cleanTxnid, savedReg);
+
+  // 2. Persist to Google Sheets
+  await saveRegistrationToSheets(savedReg).catch((e) =>
+    console.warn('Google Sheets saveRegistration note:', e)
+  );
 
   return savedReg;
 }
 
 export async function getRegistrationByTxnId(txnid: string): Promise<StudentRegistration | null> {
-  const sql = getDb();
-  if (sql) {
-    try {
-      await initDbSchema();
-      const res = await sql`SELECT * FROM student_registrations WHERE txnid = ${txnid} LIMIT 1;`;
-      if (res && res.length > 0) {
-        const row = res[0];
-        return {
-          id: row.id,
-          txnid: row.txnid,
-          fullName: row.full_name,
-          dob: row.dob,
-          address: row.address,
-          aadharCard: row.aadhar_card,
-          gender: row.gender,
-          email: row.email,
-          phone: row.phone,
-          pan: row.pan,
-          occupation: row.occupation,
-          submittedAt: row.submitted_at
-        };
-      }
-    } catch (err) {
-      console.error('Neon DB getRegistrationByTxnId error:', err);
-    }
+  const cleanTxnid = txnid ? txnid.trim() : '';
+  if (!cleanTxnid) return null;
+
+  // 1. Check in-memory cache
+  const cached = memoryStore.registrations.get(cleanTxnid);
+  if (cached) return cached;
+
+  // 2. Query Google Sheets
+  const sheetReg = await getRegistrationFromSheets(cleanTxnid);
+  if (sheetReg) {
+    memoryStore.registrations.set(cleanTxnid, sheetReg);
+    return sheetReg;
   }
 
-  return memoryStore.registrations.get(txnid) || null;
+  return null;
 }

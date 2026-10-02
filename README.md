@@ -9,11 +9,11 @@ Official course fee payment and student enrollment portal for **Music Tutorship*
 - **Student KYC Registration**: Mandatory 9-field student verification post-payment (Full Name, DOB, Address, Aadhaar, Gender, Email, Phone, PAN, Occupation).
 - **Official Admission Receipt**: Printable receipt generation with Order ID and WhatsApp batch onboarding link.
 - **Student Lookup**: Self-service receipt lookup by Transaction / Order ID.
-- **Neon Cloud PostgreSQL**: Serverless database for persisting payment records and student KYC data.
+- **Google Sheets Backend**: Direct cloud spreadsheet persistence via Google Apps Script Web App for payments and registrations.
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` or set these in your hosting provider dashboard:
+Copy `.env.example` to `.env.local` or set these in your Vercel dashboard:
 
 ```env
 # Application URL
@@ -27,10 +27,8 @@ PAYU_ENV=production
 PAYU_IS_LIVE=true
 PAYU_PAYMENT_URL=https://secure.payu.in/_payment
 
-# Neon Cloud PostgreSQL
-DATABASE_URL=postgresql://user:password@ep-host.region.aws.neon.tech/neondb?sslmode=require
-NEON_PROJECT_ID=your_neon_project_id
-NEON_BRANCH=production
+# Google Sheets Web App (Apps Script API)
+GOOGLE_SHEETS_API_URL=https://script.google.com/macros/s/your_deployment_id/exec
 ```
 
 ## Getting Started
@@ -45,4 +43,3 @@ npm run dev
 # Build for production
 npm run build
 ```
-
