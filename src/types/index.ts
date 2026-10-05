@@ -11,6 +11,7 @@ export interface Course {
   batchSize: string;
   features: string[];
   popular?: boolean;
+  disabled?: boolean;
 }
 
 export interface PaymentRecord {

@@ -74,13 +74,14 @@ function getFriendlyErrorMessage(rawError?: string | null): string {
 function HomeContent() {
   const searchParams = useSearchParams();
 
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('mastery');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('bootcamp');
 
   // Student initial checkout info
   const [studentName, setStudentName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [termsAccepted, setTermsAccepted] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
@@ -90,16 +91,23 @@ function HomeContent() {
   const errorParam = searchParams.get('error');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const selectedCourse = getCourseById(selectedCourseId) || COURSES[0];
+  const selectedCourse = getCourseById(selectedCourseId) || COURSES[1] || COURSES[0];
   const payableAmount = selectedCourse.price;
 
   const handleCourseSelect = (courseId: string) => {
+    const course = COURSES.find((c) => c.id === courseId);
+    if (course?.disabled) return;
     setSelectedCourseId(courseId);
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+
+    if (!termsAccepted) {
+      setFormError('Please accept the Terms & Conditions to proceed.');
+      return;
+    }
 
     if (!studentName.trim()) {
       setFormError('Please enter your full name.');
@@ -252,17 +260,30 @@ function HomeContent() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {COURSES.map((course) => {
                 const isSelected = selectedCourseId === course.id;
+                const isDisabled = !!course.disabled;
+
                 return (
                   <div
                     key={course.id}
-                    onClick={() => handleCourseSelect(course.id)}
+                    onClick={() => !isDisabled && handleCourseSelect(course.id)}
                     className="clean-card"
                     style={{
                       padding: '20px 24px',
-                      cursor: 'pointer',
-                      border: isSelected ? '2px solid #e2b13c' : '1px solid #e2e8f0',
-                      backgroundColor: isSelected ? '#fefbf3' : '#ffffff',
-                      position: 'relative'
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      opacity: isDisabled ? 0.6 : 1,
+                      border: isSelected
+                        ? '2px solid #e2b13c'
+                        : isDisabled
+                        ? '1px dashed #cbd5e1'
+                        : '1px solid #e2e8f0',
+                      backgroundColor: isSelected
+                        ? '#fefbf3'
+                        : isDisabled
+                        ? '#f8fafc'
+                        : '#ffffff',
+                      position: 'relative',
+                      transition: 'all 0.2s ease',
+                      userSelect: 'none'
                     }}
                   >
                     {/* Badge */}
@@ -275,8 +296,16 @@ function HomeContent() {
                         fontWeight: 700,
                         padding: '4px 8px',
                         borderRadius: '0px',
-                        backgroundColor: course.popular ? 'rgba(226, 177, 60, 0.15)' : 'rgba(15, 23, 42, 0.06)',
-                        color: course.popular ? '#b8871b' : '#334155',
+                        backgroundColor: isDisabled
+                          ? 'rgba(100, 116, 139, 0.12)'
+                          : course.popular
+                          ? 'rgba(226, 177, 60, 0.15)'
+                          : 'rgba(15, 23, 42, 0.06)',
+                        color: isDisabled
+                          ? '#64748b'
+                          : course.popular
+                          ? '#b8871b'
+                          : '#334155',
                         border: 'none',
                         letterSpacing: '0.5px'
                       }}>
@@ -284,11 +313,23 @@ function HomeContent() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: isDisabled ? '#94a3b8' : '#b8871b',
+                      letterSpacing: '0.5px',
+                      marginBottom: '4px'
+                    }}>
                       {course.tag}
                     </div>
 
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginBottom: '2px', paddingRight: '80px' }}>
+                    <h3 style={{
+                      fontSize: '16px',
+                      fontWeight: 700,
+                      color: isDisabled ? '#475569' : '#0f172a',
+                      marginBottom: '2px',
+                      paddingRight: '110px'
+                    }}>
                       {course.title}
                     </h3>
                     <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
@@ -298,51 +339,92 @@ function HomeContent() {
                     {/* Features list */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px', marginBottom: '14px' }}>
                       {course.features.slice(0, 4).map((feat, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#334155' }}>
-                          <div style={{ width: '4px', height: '4px', borderRadius: '0px', backgroundColor: '#e2b13c' }} />
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          color: isDisabled ? '#64748b' : '#334155'
+                        }}>
+                          <div style={{
+                            width: '4px',
+                            height: '4px',
+                            borderRadius: '0px',
+                            backgroundColor: isDisabled ? '#94a3b8' : '#e2b13c'
+                          }} />
                           <span>{feat}</span>
                         </div>
                       ))}
                     </div>
 
-                    {/* Price and Radio Indicator */}
+                    {/* Price, Terms Text, and Radio Indicator */}
                     <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       borderTop: '1px solid #e2e8f0',
                       paddingTop: '12px'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                        <span style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
-                          ₹{course.price.toLocaleString('en-IN')}
-                        </span>
-                        {course.originalPrice && (
-                          <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
-                            ₹{course.originalPrice.toLocaleString('en-IN')}
-                          </span>
-                        )}
-                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>All-Inclusive</span>
-                      </div>
-
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: isSelected ? '#000000' : '#64748b'
+                        justifyContent: 'space-between'
                       }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ fontSize: '20px', fontWeight: 800, color: isDisabled ? '#64748b' : '#0f172a' }}>
+                            ₹{course.price.toLocaleString('en-IN')}
+                          </span>
+                          {course.originalPrice && (
+                            <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
+                              ₹{course.originalPrice.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>
+                            All-Inclusive
+                          </span>
+                        </div>
+
                         <div style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '50%',
-                          border: isSelected ? '5px solid #e2b13c' : '1.5px solid #cbd5e1',
-                          backgroundColor: '#ffffff',
-                          boxSizing: 'border-box',
-                          flexShrink: 0
-                        }} />
-                        <span>{isSelected ? 'Selected' : 'Select'}</span>
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: isDisabled ? '#94a3b8' : isSelected ? '#000000' : '#64748b'
+                        }}>
+                          {isDisabled ? (
+                            <span style={{
+                              fontSize: '11px',
+                              color: '#64748b',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              backgroundColor: '#e2e8f0',
+                              borderRadius: '0px'
+                            }}>
+                              Unselectable
+                            </span>
+                          ) : (
+                            <>
+                              <div style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                border: isSelected ? '5px solid #e2b13c' : '1.5px solid #cbd5e1',
+                                backgroundColor: '#ffffff',
+                                boxSizing: 'border-box',
+                                flexShrink: 0
+                              }} />
+                              <span>{isSelected ? 'Selected' : 'Select'}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* *Terms & Conditions applied for all courses */}
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#64748b',
+                        fontStyle: 'italic',
+                        marginTop: '6px'
+                      }}>
+                        *Terms & Conditions applied
                       </div>
                     </div>
                   </div>
@@ -438,7 +520,7 @@ function HomeContent() {
                   border: '1px solid #e2e8f0',
                   borderRadius: '0px',
                   padding: '14px',
-                  margin: '18px 0 18px 0',
+                  margin: '18px 0 14px 0',
                   fontSize: '13px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '6px' }}>
@@ -466,12 +548,60 @@ function HomeContent() {
                   </div>
                 </div>
 
+                {/* Terms and Conditions Checkbox */}
+                <div style={{
+                  margin: '14px 0 16px 0',
+                  padding: '12px 14px',
+                  backgroundColor: termsAccepted ? 'rgba(21, 128, 61, 0.04)' : '#f8fafc',
+                  border: termsAccepted ? '1px solid rgba(21, 128, 61, 0.3)' : '1px solid #e2e8f0',
+                  borderRadius: '0px',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: '#334155',
+                    lineHeight: 1.45,
+                    userSelect: 'none'
+                  }}>
+                    <input
+                      id="termsCheckbox"
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => {
+                        setTermsAccepted(e.target.checked);
+                        if (formError && !termsAccepted) setFormError('');
+                      }}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        marginTop: '1px',
+                        accentColor: '#0f172a',
+                        cursor: 'pointer',
+                        flexShrink: 0
+                      }}
+                    />
+                    <span>
+                      By accepting you agree to the <strong>Terms & Conditions</strong>, Enrollment Policy, and Code of Conduct *
+                    </span>
+                  </label>
+                </div>
+
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={!termsAccepted || isSubmitting}
                   className="btn-primary"
-                  style={{ fontSize: '14px', padding: '14px' }}
+                  style={{
+                    fontSize: '14px',
+                    padding: '14px',
+                    opacity: (!termsAccepted || isSubmitting) ? 0.5 : 1,
+                    cursor: (!termsAccepted || isSubmitting) ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   {isSubmitting && (
                     <Loader2 className="animate-spin" size={18} style={{ animation: 'spin 1s linear infinite' }} />

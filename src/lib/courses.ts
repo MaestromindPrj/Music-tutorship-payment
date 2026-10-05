@@ -6,9 +6,10 @@ export const COURSES: Course[] = [
     title: 'Complete Music Production Mastery Course',
     subtitle: 'From Beginner to Advanced',
     tag: '01 / FOUNDATION',
-    badge: 'MOST ENROLLED',
-    price: 1,
-    originalPrice: 49999,
+    badge: 'ADMISSIONS CLOSED',
+    disabled: true,
+    price: 49999,
+    originalPrice: 65000,
     duration: '12 Months Intensive Program',
     batchSize: '25 Students per Batch',
     features: [
@@ -26,8 +27,9 @@ export const COURSES: Course[] = [
     title: 'Producer Transformation Path',
     subtitle: 'From Intermediate to Advanced',
     tag: '02 / INTENSIVE',
-    badge: 'POPULAR CHOICE',
+    badge: 'ENROLLING NOW',
     popular: true,
+    disabled: false,
     price: 34999,
     originalPrice: 48000,
     duration: '4 Months Intensive',
@@ -47,7 +49,8 @@ export const COURSES: Course[] = [
     title: '1-on-1 Music Production Mentorship',
     subtitle: 'Personalized Learning Experience',
     tag: '03 / PERSONALIZED',
-    badge: 'PREMIUM TIER',
+    badge: 'ADMISSIONS CLOSED',
+    disabled: true,
     price: 59999,
     originalPrice: 75000,
     duration: 'Customized / Flexible Schedule',
@@ -65,5 +68,5 @@ export const COURSES: Course[] = [
 ];
 
 export function getCourseById(id: string): Course | undefined {
-  return COURSES.find((c) => c.id === id) || COURSES[0];
+  return COURSES.find((c) => c.id === id) || COURSES.find((c) => !c.disabled) || COURSES[1] || COURSES[0];
 }
