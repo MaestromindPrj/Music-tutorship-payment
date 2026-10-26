@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPayUConfig, verifyPayUResponseHash } from '@/lib/payu';
 import { updatePaymentStatus } from '@/lib/db';
+import { markConsultationPaid } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,6 +72,10 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = (status?.toLowerCase() === 'success' || status?.toLowerCase() === 'captured') && isVerified;
 
+    if (isSuccess && (udf1 === 'call-consultation' || productinfo?.toLowerCase().includes('consultation')) && email) {
+      markConsultationPaid(email);
+    }
+
     // Update Google Sheets & cache with verified transaction status
     await updatePaymentStatus(
       txnid,
@@ -93,6 +98,9 @@ export async function POST(req: NextRequest) {
     const origin = req.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     if (isSuccess) {
+      if (udf1 === 'call-consultation' || productinfo?.toLowerCase().includes('consultation')) {
+        return NextResponse.redirect(new URL(`/confirmation?txnid=${encodeURIComponent(txnid)}`, origin), 303);
+      }
       // Redirect to the mandatory registration form after payment
       return NextResponse.redirect(new URL(`/register?txnid=${encodeURIComponent(txnid)}`, origin), 303);
     } else {

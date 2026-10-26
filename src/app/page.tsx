@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Lock,
@@ -8,9 +8,13 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
-  Loader2
+  CheckCircle2,
+  Loader2,
+  User,
+  Sparkles
 } from 'lucide-react';
 import { COURSES, getCourseById } from '@/lib/courses';
+import AuthModal from '@/components/AuthModal';
 
 function getFriendlyErrorMessage(rawError?: string | null): string {
   if (!rawError) {
@@ -74,7 +78,12 @@ function getFriendlyErrorMessage(rawError?: string | null): string {
 function HomeContent() {
   const searchParams = useSearchParams();
 
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('bootcamp');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('producer-transformation');
+
+  // Authenticated user state
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; hasPaidConsultation: boolean } | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authActionPrompt, setAuthActionPrompt] = useState<string>('');
 
   // Student initial checkout info
   const [studentName, setStudentName] = useState<string>('');
@@ -91,8 +100,61 @@ function HomeContent() {
   const errorParam = searchParams.get('error');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const selectedCourse = getCourseById(selectedCourseId) || COURSES[1] || COURSES[0];
-  const payableAmount = selectedCourse.price;
+  // Sync user from localStorage & verify consultation credit
+  useEffect(() => {
+    const syncUser = async () => {
+      try {
+        const stored = localStorage.getItem('mt_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setCurrentUser(parsed);
+          if (parsed.email) {
+            setEmail(parsed.email);
+            if (parsed.name && !studentName) {
+              setStudentName(parsed.name);
+            }
+
+            // Verify live consultation status from server
+            try {
+              const res = await fetch(`/api/auth/consultation-status?email=${encodeURIComponent(parsed.email)}`);
+              const data = await res.json();
+              if (data.hasPaidConsultation !== parsed.hasPaidConsultation) {
+                const updated = { ...parsed, hasPaidConsultation: !!data.hasPaidConsultation };
+                setCurrentUser(updated);
+                localStorage.setItem('mt_user', JSON.stringify(updated));
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+        } else {
+          setCurrentUser(null);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    syncUser();
+    window.addEventListener('auth-change', syncUser);
+    window.addEventListener('storage', syncUser);
+    return () => {
+      window.removeEventListener('auth-change', syncUser);
+      window.removeEventListener('storage', syncUser);
+    };
+  }, []);
+
+  const selectedCourse = getCourseById(selectedCourseId) || COURSES[0];
+  const isProducerCourse = selectedCourseId === 'producer-transformation' || selectedCourseId === 'bootcamp';
+  const hasConsultationCredit = isProducerCourse && !!currentUser?.hasPaidConsultation;
+
+  // Base fee calculation
+  const rawBaseFee = selectedCourse.price;
+  const effectiveBaseFee = hasConsultationCredit ? 149000 : rawBaseFee;
+
+  // 18% Tax added to right side Enrollment Summary
+  const taxAmount = Math.round(effectiveBaseFee * 0.18);
+  const totalPayable = effectiveBaseFee + taxAmount;
 
   const handleCourseSelect = (courseId: string) => {
     const course = COURSES.find((c) => c.id === courseId);
@@ -104,6 +166,13 @@ function HomeContent() {
     e.preventDefault();
     setFormError('');
 
+    // MANDATORY REQUIREMENT: Check whether user is logged in
+    if (!currentUser) {
+      setAuthActionPrompt('Email login is mandatory to proceed with fee payment. Please log in or sign up to continue.');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     if (!termsAccepted) {
       setFormError('Please accept the Terms & Conditions to proceed.');
       return;
@@ -113,7 +182,8 @@ function HomeContent() {
       setFormError('Please enter your full name.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
+    const userEmail = (currentUser.email || email).trim().toLowerCase();
+    if (!userEmail || !userEmail.includes('@')) {
       setFormError('Please enter a valid email address.');
       return;
     }
@@ -132,7 +202,7 @@ function HomeContent() {
         body: JSON.stringify({
           courseId: selectedCourseId,
           studentName: studentName.trim(),
-          email: email.trim().toLowerCase(),
+          email: userEmail,
           phone: cleanPhone,
           notes: notes.trim()
         })
@@ -144,7 +214,7 @@ function HomeContent() {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = data.formData.actionUrl || 'https://secure.payu.in/_payment';
-        
+
         Object.entries(data.formData).forEach(([key, val]) => {
           if (key !== 'actionUrl' && val !== undefined && val !== null) {
             const input = document.createElement('input');
@@ -154,7 +224,7 @@ function HomeContent() {
             form.appendChild(input);
           }
         });
-        
+
         document.body.appendChild(form);
         form.submit();
       } else {
@@ -173,7 +243,15 @@ function HomeContent() {
       a: 'We accept all major payment methods including UPI (Google Pay, PhonePe, Paytm), Credit Cards (Visa, MasterCard, RuPay), Debit Cards, and NetBanking across all major Indian banks.'
     },
     {
-      q: 'What happens after completing the payment?',
+      q: 'What happens after completing Call Consultation payment?',
+      a: 'After completing the ₹10,000 (+ 18% tax) payment for Call Consultation, you will instantly be able to schedule your 1-on-1 strategy meeting via Calendly. Furthermore, your ₹10,000 payment will be automatically credited and deducted when you enroll in the Producer Transformation Path program!'
+    },
+    {
+      q: 'How does the ₹10,000 consultation credit work?',
+      a: 'When you log in with the email used for your Call Consultation, the Producer Transformation Path program fee automatically reduces from ₹1,59,000 to ₹1,49,000 (+ 18% tax), giving you full credit for your consultation fee.'
+    },
+    {
+      q: 'What happens after completing the course fee payment?',
       a: 'Upon payment confirmation, you will be directed to complete your student registration details (Name, DOB, Address, Identification, etc.) to receive your official admission receipt and WhatsApp onboarding link.'
     },
     {
@@ -207,6 +285,27 @@ function HomeContent() {
         </div>
       )}
 
+      {/* Consultation Credit Recognition Banner */}
+      {currentUser?.hasPaidConsultation && (
+        <div style={{
+          backgroundColor: '#fefbf3',
+          borderBottom: '1px solid #fde68a',
+          padding: '12px 24px',
+          textAlign: 'center',
+          color: '#854d0e',
+          fontSize: '13px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px'
+        }}>
+          <Sparkles size={16} style={{ color: '#b8871b' }} />
+          <span>
+            <strong>Consultation Credit Recognized:</strong> Since you already paid ₹10,000 for Call Consultation, the Producer Transformation Path is discounted by ₹10,000 to <strong>₹1,49,000</strong> (+ 18% Tax).
+          </span>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section style={{ padding: '40px 0 24px 0', textAlign: 'center' }}>
         <div className="container">
@@ -221,18 +320,18 @@ function HomeContent() {
           </h1>
 
           <p className="section-desc" style={{ margin: '0 auto 8px auto', maxWidth: '640px' }}>
-            Select your enrolled program below to proceed to secure fee payment and student registration.
+            Select your enrolled program or consultation below to proceed to secure fee payment and student registration.
           </p>
         </div>
       </section>
 
-      {/* Main Payment Section: Course Selector + Checkout Form */}
+      {/* Main Payment Section: Options Selector + Checkout Form */}
       <section className="container" id="checkout-section">
         {/* Step Indicator */}
         <div className="steps-nav">
           <div className="step-item active">
             <div className="step-number">1</div>
-            <span>Select Program</span>
+            <span>Select Program / Option</span>
           </div>
           <div className="step-item">
             <div className="step-number">2</div>
@@ -249,18 +348,23 @@ function HomeContent() {
         </div>
 
         <div className="grid-2">
-          {/* Left Column: Course Selection Cards */}
+          {/* Left Column: Course & Consultation Selection Cards */}
           <div>
-            <div style={{ marginBottom: '16px' }}>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
-                Select Your Program
+                Select Your Program or Consultation
               </h2>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>
+                2 Available Options
+              </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {COURSES.map((course) => {
                 const isSelected = selectedCourseId === course.id;
                 const isDisabled = !!course.disabled;
+                const isCourseProducer = course.id === 'producer-transformation' || course.id === 'bootcamp';
+                const hasCredit = isCourseProducer && !!currentUser?.hasPaidConsultation;
 
                 return (
                   <div
@@ -268,7 +372,7 @@ function HomeContent() {
                     onClick={() => !isDisabled && handleCourseSelect(course.id)}
                     className="clean-card"
                     style={{
-                      padding: '20px 24px',
+                      padding: '24px',
                       cursor: isDisabled ? 'not-allowed' : 'pointer',
                       opacity: isDisabled ? 0.6 : 1,
                       border: isSelected
@@ -287,31 +391,50 @@ function HomeContent() {
                     }}
                   >
                     {/* Badge */}
-                    {course.badge && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '16px',
-                        right: '16px',
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        padding: '4px 8px',
-                        borderRadius: '0px',
-                        backgroundColor: isDisabled
-                          ? 'rgba(100, 116, 139, 0.12)'
-                          : course.popular
-                          ? 'rgba(226, 177, 60, 0.15)'
-                          : 'rgba(15, 23, 42, 0.06)',
-                        color: isDisabled
-                          ? '#64748b'
-                          : course.popular
-                          ? '#b8871b'
-                          : '#334155',
-                        border: 'none',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {course.badge}
-                      </div>
-                    )}
+                    <div style={{
+                      position: 'absolute',
+                      top: '18px',
+                      right: '18px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      gap: '4px'
+                    }}>
+                      {course.badge && (
+                        <div style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '4px 8px',
+                          borderRadius: '0px',
+                          backgroundColor: isDisabled
+                            ? 'rgba(100, 116, 139, 0.12)'
+                            : course.popular
+                            ? 'rgba(226, 177, 60, 0.15)'
+                            : 'rgba(15, 23, 42, 0.06)',
+                          color: isDisabled
+                            ? '#64748b'
+                            : course.popular
+                            ? '#b8871b'
+                            : '#334155',
+                          border: 'none',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {course.badge}
+                        </div>
+                      )}
+                      {hasCredit && (
+                        <div style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          backgroundColor: 'rgba(21, 128, 61, 0.12)',
+                          color: '#15803d',
+                          letterSpacing: '0.4px'
+                        }}>
+                          ₹10,000 CREDIT APPLIED
+                        </div>
+                      )}
+                    </div>
 
                     <div style={{
                       fontSize: '11px',
@@ -324,11 +447,11 @@ function HomeContent() {
                     </div>
 
                     <h3 style={{
-                      fontSize: '16px',
+                      fontSize: '17px',
                       fontWeight: 700,
                       color: isDisabled ? '#475569' : '#0f172a',
                       marginBottom: '2px',
-                      paddingRight: '110px'
+                      paddingRight: '120px'
                     }}>
                       {course.title}
                     </h3>
@@ -337,8 +460,8 @@ function HomeContent() {
                     </p>
 
                     {/* Features list */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '6px', marginBottom: '14px' }}>
-                      {course.features.slice(0, 4).map((feat, idx) => (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '6px', marginBottom: '16px' }}>
+                      {course.features.slice(0, 5).map((feat, idx) => (
                         <div key={idx} style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -357,30 +480,58 @@ function HomeContent() {
                       ))}
                     </div>
 
-                    {/* Price, Terms Text, and Radio Indicator */}
+                    {/* Price, Taxes Notice, and Radio Indicator */}
                     <div style={{
                       borderTop: '1px solid #e2e8f0',
-                      paddingTop: '12px'
+                      paddingTop: '14px'
                     }}>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between'
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '10px'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <span style={{ fontSize: '20px', fontWeight: 800, color: isDisabled ? '#64748b' : '#0f172a' }}>
-                            ₹{course.price.toLocaleString('en-IN')}
-                          </span>
-                          {course.originalPrice && (
-                            <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
-                              ₹{course.originalPrice.toLocaleString('en-IN')}
-                            </span>
+                        {/* Amount & Tax indication */}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                          {hasCredit ? (
+                            <>
+                              <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
+                                ₹1,49,000
+                              </span>
+                              <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
+                                ₹1,59,000
+                              </span>
+                              <span style={{ fontSize: '12px', color: '#cbd5e1', textDecoration: 'line-through' }}>
+                                ₹1,70,000
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: '22px', fontWeight: 800, color: isDisabled ? '#64748b' : '#0f172a' }}>
+                                ₹{course.price.toLocaleString('en-IN')}
+                              </span>
+                              {course.originalPrice && (
+                                <span style={{ fontSize: '14px', color: '#94a3b8', textDecoration: 'line-through' }}>
+                                  ₹{course.originalPrice.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </>
                           )}
-                          <span style={{ fontSize: '11px', color: '#15803d', fontWeight: 600 }}>
-                            All-Inclusive
+
+                          {/* Specific note that taxes apply additionally */}
+                          <span style={{
+                            fontSize: '11px',
+                            color: '#b8871b',
+                            fontWeight: 600,
+                            backgroundColor: 'rgba(226, 177, 60, 0.12)',
+                            padding: '3px 7px'
+                          }}>
+                            + Taxes apply additionally
                           </span>
                         </div>
 
+                        {/* Select radio */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -417,14 +568,16 @@ function HomeContent() {
                         </div>
                       </div>
 
-                      {/* *Terms & Conditions applied for all courses */}
+                      {/* Small Footer Text */}
                       <div style={{
                         fontSize: '11px',
                         color: '#64748b',
                         fontStyle: 'italic',
-                        marginTop: '6px'
+                        marginTop: '8px'
                       }}>
-                        *Terms & Conditions applied
+                        {course.id === 'call-consultation'
+                          ? '*Schedule immediately via Calendly upon payment. ₹10,000 credited if joining Producer Transformation Path.'
+                          : '*18% GST will be calculated & shown in right-side Enrollment Summary.'}
                       </div>
                     </div>
                   </div>
@@ -433,7 +586,7 @@ function HomeContent() {
             </div>
           </div>
 
-          {/* Right Column: Checkout Form */}
+          {/* Right Column: Checkout Form & Summary */}
           <div>
             <div className="clean-card" style={{ padding: '28px', position: 'sticky', top: '90px' }}>
               <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '20px' }}>
@@ -444,6 +597,58 @@ function HomeContent() {
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                   {selectedCourse.title}
                 </p>
+              </div>
+
+              {/* Login Status Indicator / Prompt */}
+              <div style={{
+                marginBottom: '16px',
+                padding: '10px 14px',
+                backgroundColor: currentUser ? '#f0fdf4' : '#fffbeb',
+                border: currentUser ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {currentUser ? (
+                    <>
+                      <CheckCircle2 size={16} style={{ color: '#15803d', flexShrink: 0 }} />
+                      <span style={{ color: '#166534' }}>
+                        Logged in as: <strong>{currentUser.email}</strong>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <User size={16} style={{ color: '#b45309', flexShrink: 0 }} />
+                      <span style={{ color: '#92400e' }}>
+                        <strong>Email Login is required</strong> to complete checkout.
+                      </span>
+                    </>
+                  )}
+                </div>
+                {!currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthActionPrompt('Please log in with your email and password to proceed.');
+                      setIsAuthModalOpen(true);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#0f172a',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      fontSize: '12px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Log In Now
+                  </button>
+                )}
               </div>
 
               {formError && (
@@ -485,7 +690,9 @@ function HomeContent() {
                 <div className="form-group">
                   <label className="form-label" htmlFor="email">
                     <span>Email Address *</span>
-                    <span className="form-label-tag">For Receipt & LMS</span>
+                    <span className="form-label-tag">
+                      {currentUser ? 'Verified Account' : 'Mandatory Login'}
+                    </span>
                   </label>
                   <input
                     id="email"
@@ -493,8 +700,10 @@ function HomeContent() {
                     required
                     className="form-input"
                     placeholder="name@example.com"
-                    value={email}
+                    value={currentUser?.email || email}
                     onChange={(e) => setEmail(e.target.value)}
+                    readOnly={!!currentUser}
+                    style={{ backgroundColor: currentUser ? '#f8fafc' : '#ffffff' }}
                   />
                 </div>
 
@@ -514,41 +723,65 @@ function HomeContent() {
                   />
                 </div>
 
-                {/* Fee Breakdown Card */}
+                {/* Fee Breakdown Card with explicit 18% Tax */}
                 <div style={{
                   backgroundColor: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: '0px',
-                  padding: '14px',
+                  padding: '16px',
                   margin: '18px 0 14px 0',
                   fontSize: '13px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '6px' }}>
-                    <span>Course Subtotal:</span>
-                    <span>₹{payableAmount.toLocaleString('en-IN')}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '8px' }}>
+                    <span>{selectedCourse.title} Base Fee:</span>
+                    <span>₹{rawBaseFee.toLocaleString('en-IN')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '6px' }}>
-                    <span>Taxes & Processing:</span>
-                    <span style={{ color: '#15803d' }}>Included (₹0 Extra)</span>
+
+                  {hasConsultationCredit && (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      color: '#15803d',
+                      marginBottom: '8px',
+                      fontWeight: 600,
+                      backgroundColor: 'rgba(21, 128, 61, 0.08)',
+                      padding: '4px 8px'
+                    }}>
+                      <span>Consultation Credit Paid:</span>
+                      <span>-₹10,000</span>
+                    </div>
+                  )}
+
+                  {hasConsultationCredit && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '8px' }}>
+                      <span>Adjusted Subtotal:</span>
+                      <span>₹{effectiveBaseFee.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0f172a', marginBottom: '8px' }}>
+                    <span>Additional Tax (18% GST):</span>
+                    <span style={{ fontWeight: 600, color: '#b8871b' }}>+₹{taxAmount.toLocaleString('en-IN')}</span>
                   </div>
+
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     borderTop: '1px solid #e2e8f0',
-                    paddingTop: '8px',
+                    paddingTop: '10px',
                     fontWeight: 700,
                     fontSize: '15px',
                     color: '#0f172a'
                   }}>
                     <span>Total Payable:</span>
-                    <span style={{ color: '#000000', fontSize: '18px', fontWeight: 800 }}>
-                      ₹{payableAmount.toLocaleString('en-IN')}
+                    <span style={{ color: '#000000', fontSize: '20px', fontWeight: 800 }}>
+                      ₹{totalPayable.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>
 
-                {/* Terms and Conditions Checkbox */}
+                {/* Terms and Conditions Checkbox with Hyperlink */}
                 <div style={{
                   margin: '14px 0 16px 0',
                   padding: '12px 14px',
@@ -585,7 +818,21 @@ function HomeContent() {
                       }}
                     />
                     <span>
-                      By accepting you agree to the <strong>Terms & Conditions</strong>, Enrollment Policy, and Code of Conduct *
+                      By accepting you agree to the{' '}
+                      <a
+                        href="https://www.musictutorship.in/terms-of-services"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          textDecoration: 'underline'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Terms &amp; Conditions
+                      </a>
+                      , Enrollment Policy, and Code of Conduct *
                     </span>
                   </label>
                 </div>
@@ -593,20 +840,26 @@ function HomeContent() {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={!termsAccepted || isSubmitting}
+                  disabled={isSubmitting}
                   className="btn-primary"
                   style={{
                     fontSize: '14px',
                     padding: '14px',
-                    opacity: (!termsAccepted || isSubmitting) ? 0.5 : 1,
-                    cursor: (!termsAccepted || isSubmitting) ? 'not-allowed' : 'pointer',
+                    opacity: isSubmitting ? 0.7 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease'
                   }}
                 >
                   {isSubmitting && (
                     <Loader2 className="animate-spin" size={18} style={{ animation: 'spin 1s linear infinite' }} />
                   )}
-                  <span>{isSubmitting ? 'Connecting...' : `Proceed to Payment (₹${payableAmount.toLocaleString('en-IN')})`}</span>
+                  <span>
+                    {isSubmitting
+                      ? 'Connecting...'
+                      : !currentUser
+                      ? 'Log In to Proceed to Payment'
+                      : `Proceed to Payment (₹${totalPayable.toLocaleString('en-IN')})`}
+                  </span>
                   <ArrowRight size={16} />
                 </button>
               </form>
@@ -623,7 +876,7 @@ function HomeContent() {
                 marginTop: '16px'
               }}>
                 <Lock size={13} strokeWidth={2.2} style={{ color: '#71717a' }} />
-                <span>Guaranteed safe & secure checkout</span>
+                <span>Guaranteed safe &amp; secure checkout</span>
               </div>
             </div>
           </div>
@@ -634,7 +887,7 @@ function HomeContent() {
       <section className="container" style={{ padding: '48px 24px 16px 24px' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <span className="section-overline">QUESTIONS & ANSWERS</span>
+            <span className="section-overline">QUESTIONS &amp; ANSWERS</span>
             <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>Frequently Asked Questions</h2>
           </div>
 
@@ -670,6 +923,20 @@ function HomeContent() {
           </div>
         </div>
       </section>
+
+      {/* Mandatory Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        actionPrompt={authActionPrompt}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          setEmail(user.email);
+          if (user.name && !studentName) {
+            setStudentName(user.name);
+          }
+        }}
+      />
     </div>
   );
 }

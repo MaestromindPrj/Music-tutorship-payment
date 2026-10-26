@@ -50,7 +50,11 @@ function RegisterFormContent() {
         setIsLoading(false);
         if (data.success && data.payment) {
           setPayment(data.payment);
-          if (data.registration) {
+          if (
+            data.registration ||
+            data.payment.courseId === 'call-consultation' ||
+            data.payment.courseName?.toLowerCase().includes('consultation')
+          ) {
             router.push(`/confirmation?txnid=${encodeURIComponent(txnid)}`);
             return;
           }

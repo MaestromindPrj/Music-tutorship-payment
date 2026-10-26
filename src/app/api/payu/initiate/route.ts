@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPayUConfig, generatePayUHash, generateTxnId } from '@/lib/payu';
 import { getCourseById } from '@/lib/courses';
 import { savePayment } from '@/lib/db';
+import { hasUserPaidConsultation } from '@/lib/auth';
 import { PayUInitiatePayload, PayUFormData } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -16,21 +17,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cleanEmail = email.trim().toLowerCase();
     const course = getCourseById(courseId);
-    const amount = course ? course.price : 49999;
+    
+    // Check consultation payment status for this email
+    const hasConsultationCredit = hasUserPaidConsultation(cleanEmail);
 
-    const amountFormatted = amount.toFixed(2);
+    let basePrice = course ? course.price : 159000;
+    if ((courseId === 'producer-transformation' || courseId === 'bootcamp') && hasConsultationCredit) {
+      basePrice = 149000; // 1,59,000 - 10,000 consultation credit
+    } else if (courseId === 'call-consultation') {
+      basePrice = 10000;
+    }
+
+    // 18% Tax added to Enrollment Summary and Payable Amount
+    const taxAmount = Math.round(basePrice * 0.18);
+    const totalAmount = basePrice + taxAmount;
+
+    const amountFormatted = totalAmount.toFixed(2);
     const txnid = generateTxnId();
     const courseName = course ? course.title : 'Music Production Course Fee';
 
     // Save initial transaction record to Google Sheets & memory cache
     await savePayment({
       txnid,
-      amount,
+      amount: totalAmount,
       courseName,
       courseId,
       studentName: studentName.trim(),
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       phone: phone.trim(),
       status: 'PENDING',
       errorMessage: notes || undefined,
@@ -43,14 +58,14 @@ export async function POST(req: NextRequest) {
     const surl = `${origin}/api/payu/callback`;
     const furl = `${origin}/api/payu/callback`;
 
-    // Calculate PayU SHA-512 Hash
+    // Calculate PayU SHA-512 Hash with total amount (base + 18% tax)
     const hash = generatePayUHash({
       key: config.merchantKey,
       txnid,
       amount: amountFormatted,
       productinfo: courseName.replace(/[^a-zA-Z0-9 ]/g, ' ').substring(0, 95),
       firstname: studentName.trim().split(' ')[0] || studentName.trim(),
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       udf1: courseId,
       udf2: phone.trim(),
       udf3: 'payments.musictutorship.in',
@@ -68,7 +83,7 @@ export async function POST(req: NextRequest) {
       amount: amountFormatted,
       productinfo: courseName.replace(/[^a-zA-Z0-9 ]/g, ' ').substring(0, 95),
       firstname: studentName.trim().split(' ')[0] || studentName.trim(),
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
       phone: phone.trim(),
       surl,
       furl,
@@ -85,7 +100,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       txnid,
-      amount,
+      amount: totalAmount,
+      basePrice,
+      taxAmount,
       courseName,
       formData
     });

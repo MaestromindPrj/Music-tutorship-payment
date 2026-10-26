@@ -2,36 +2,15 @@ import { Course } from '@/types';
 
 export const COURSES: Course[] = [
   {
-    id: 'mastery',
-    title: 'Complete Music Production Mastery Course',
-    subtitle: 'From Beginner to Advanced',
-    tag: '01 / FOUNDATION',
-    badge: 'ADMISSIONS CLOSED',
-    disabled: true,
-    price: 49999,
-    originalPrice: 65000,
-    duration: '12 Months Intensive Program',
-    batchSize: '25 Students per Batch',
-    features: [
-      'Comprehensive Music Theory & Song Structure',
-      'Logic Pro X & Ableton Live Deep Dive',
-      'Advanced Audio Mixing & Sound Design',
-      'Industry Standard Mastering Workflows',
-      'Weekly Live Mentorship Sessions',
-      'Certificate of Completion & Portfolio Review',
-      'Lifetime Access to Exclusive Alumni Network'
-    ]
-  },
-  {
-    id: 'bootcamp',
+    id: 'producer-transformation',
     title: 'Producer Transformation Path',
     subtitle: 'From Intermediate to Advanced',
-    tag: '02 / INTENSIVE',
+    tag: '01 / INTENSIVE PROGRAM',
     badge: 'ENROLLING NOW',
     popular: true,
     disabled: false,
-    price: 34999,
-    originalPrice: 48000,
+    price: 159000,
+    originalPrice: 170000,
     duration: '4 Months Intensive',
     batchSize: '13 Students per Batch',
     features: [
@@ -45,28 +24,29 @@ export const COURSES: Course[] = [
     ]
   },
   {
-    id: 'mentorship',
-    title: '1-on-1 Music Production Mentorship',
-    subtitle: 'Personalized Learning Experience',
-    tag: '03 / PERSONALIZED',
-    badge: 'ADMISSIONS CLOSED',
-    disabled: true,
-    price: 59999,
-    originalPrice: 75000,
-    duration: 'Customized / Flexible Schedule',
-    batchSize: 'Private 1-on-1 Individual',
+    id: 'call-consultation',
+    title: 'Call Consultation',
+    subtitle: '1-on-1 Strategy & Mentorship Session',
+    tag: '02 / STRATEGY SESSION',
+    badge: 'CALENDLY BOOKING',
+    popular: false,
+    disabled: false,
+    price: 10000,
+    duration: '60 Minutes Live Session',
+    batchSize: 'Private 1-on-1 Call',
     features: [
-      '100% Tailored Curriculum to Your Musical Goals',
-      'Flexible Session Timings (Weekdays / Weekends)',
-      'Dedicated 1-on-1 Studio Mentorship Sessions',
-      'Complete Co-Production on Your Original Tracks',
-      'Vocal Tuning, Mixing Stems, & Master File Polish',
-      'Industry Networking & Artist Career Roadmap',
-      'Unlimited Project Reviews & Direct Hotline Support'
+      '1-on-1 Direct Video Consultation with Lead Mentor',
+      'Deep-Dive Project & Track Breakdown Feedback',
+      'Personalized Music Production Career Roadmap',
+      'Instant Scheduling via Calendly after payment',
+      'Fee Deductible (₹10,000) if enrolling in Producer Transformation Path'
     ]
   }
 ];
 
 export function getCourseById(id: string): Course | undefined {
-  return COURSES.find((c) => c.id === id) || COURSES.find((c) => !c.disabled) || COURSES[1] || COURSES[0];
+  if (id === 'bootcamp' || id === 'producer-transformation') {
+    return COURSES[0];
+  }
+  return COURSES.find((c) => c.id === id) || COURSES[0];
 }
