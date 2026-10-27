@@ -105,6 +105,10 @@ function ConfirmationContent() {
     payment?.courseId === 'call-consultation' ||
     payment?.courseName?.toLowerCase().includes('consultation');
 
+  const calendlyUrl = payment?.email
+    ? `https://calendly.com/musictutorship/new-meeting?name=${encodeURIComponent(payment.studentName || '')}&email=${encodeURIComponent(payment.email || '')}`
+    : 'https://calendly.com/musictutorship/new-meeting';
+
   return (
     <div className="container" style={{ padding: '32px 24px 60px 24px', maxWidth: '760px' }}>
       {/* Step Progress Nav */}
@@ -156,7 +160,7 @@ function ConfirmationContent() {
 
           {isConsultation ? (
             <a
-              href="https://calendly.com/musictutorship/consultation"
+              href={calendlyUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary action-btn"
@@ -229,7 +233,7 @@ function ConfirmationContent() {
             marginBottom: '16px'
           }}>
             <a
-              href="https://calendly.com/musictutorship/consultation"
+              href={calendlyUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary"
@@ -258,7 +262,7 @@ function ConfirmationContent() {
           }}>
             <Sparkles size={18} style={{ color: '#b8871b', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '12px', color: '#854d0e', lineHeight: 1.5 }}>
-              <strong>₹10,000 Credit Saved:</strong> Once your meeting is completed, if you decide to take the <strong>Producer Transformation Path</strong>, the ₹10,000 you paid today will be automatically deducted from the course fee (reducing ₹1,59,000 to ₹1,49,000 + 18% Tax) when logged in with <strong>{payment?.email}</strong>.
+              <strong>₹10,000 Credit Saved:</strong> If you decide to join the <strong>Producer Transformation Path</strong>, the ₹10,000 consultation fee will be deducted from the course fee (reducing ₹1,59,000 to ₹1,49,000 + 18% Tax) when logged in with <strong>{payment?.email}</strong>.
               <div style={{ marginTop: '8px' }}>
                 <Link
                   href="/"

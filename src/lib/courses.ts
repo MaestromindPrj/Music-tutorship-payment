@@ -11,7 +11,7 @@ export const COURSES: Course[] = [
     disabled: false,
     price: 159000,
     originalPrice: 170000,
-    duration: '4 Months Intensive',
+    duration: '4 Months Intensive (Hybrid)',
     batchSize: '13 Students per Batch',
     features: [
       '1 Official Commercial Song Release Guaranteed',
@@ -31,15 +31,12 @@ export const COURSES: Course[] = [
     badge: 'CALENDLY BOOKING',
     popular: false,
     disabled: false,
-    price: 10000,
+    price: 1,
     duration: '60 Minutes Live Session',
     batchSize: 'Private 1-on-1 Call',
     features: [
-      '1-on-1 Direct Video Consultation with Lead Mentor',
-      'Deep-Dive Project & Track Breakdown Feedback',
-      'Personalized Music Production Career Roadmap',
-      'Instant Scheduling via Calendly after payment',
-      'Fee Deductible (₹10,000) if enrolling in Producer Transformation Path'
+      'Schedule immediately via Calendly upon payment.',
+      'If you decide to join the Producer Transformation Path, the ₹10,000 consultation fee will be deducted from the course fee.'
     ]
   }
 ];

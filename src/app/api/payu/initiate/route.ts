@@ -23,15 +23,23 @@ export async function POST(req: NextRequest) {
     // Check consultation payment status for this email
     const hasConsultationCredit = hasUserPaidConsultation(cleanEmail);
 
+    if (courseId === 'call-consultation' && hasConsultationCredit) {
+      return NextResponse.json(
+        { error: 'Call consultation has already been booked by this account.' },
+        { status: 400 }
+      );
+    }
+
     let basePrice = course ? course.price : 159000;
     if ((courseId === 'producer-transformation' || courseId === 'bootcamp') && hasConsultationCredit) {
       basePrice = 149000; // 1,59,000 - 10,000 consultation credit
     } else if (courseId === 'call-consultation') {
-      basePrice = 10000;
+      basePrice = 1;
     }
 
-    // 18% Tax added to Enrollment Summary and Payable Amount
-    const taxAmount = Math.round(basePrice * 0.18);
+    // Call consultation is ₹1 without tax; courses have 18% tax
+    const isCallConsultation = courseId === 'call-consultation';
+    const taxAmount = isCallConsultation ? 0 : Math.round(basePrice * 0.18);
     const totalAmount = basePrice + taxAmount;
 
     const amountFormatted = totalAmount.toFixed(2);

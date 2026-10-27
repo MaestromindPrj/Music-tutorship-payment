@@ -152,13 +152,22 @@ function HomeContent() {
   const rawBaseFee = selectedCourse.price;
   const effectiveBaseFee = hasConsultationCredit ? 149000 : rawBaseFee;
 
-  // 18% Tax added to right side Enrollment Summary
-  const taxAmount = Math.round(effectiveBaseFee * 0.18);
+  // 18% Tax added to right side Enrollment Summary (Call Consultation is without tax)
+  const isConsultationSelected = selectedCourseId === 'call-consultation';
+  const taxAmount = isConsultationSelected ? 0 : Math.round(effectiveBaseFee * 0.18);
   const totalPayable = effectiveBaseFee + taxAmount;
+
+  // Auto-switch away from Call Consultation if user has already booked it
+  useEffect(() => {
+    if (currentUser?.hasPaidConsultation && selectedCourseId === 'call-consultation') {
+      setSelectedCourseId('producer-transformation');
+    }
+  }, [currentUser?.hasPaidConsultation, selectedCourseId]);
 
   const handleCourseSelect = (courseId: string) => {
     const course = COURSES.find((c) => c.id === courseId);
     if (course?.disabled) return;
+    if (courseId === 'call-consultation' && currentUser?.hasPaidConsultation) return;
     setSelectedCourseId(courseId);
   };
 
@@ -244,7 +253,7 @@ function HomeContent() {
     },
     {
       q: 'What happens after completing Call Consultation payment?',
-      a: 'After completing the ₹10,000 (+ 18% tax) payment for Call Consultation, you will instantly be able to schedule your 1-on-1 strategy meeting via Calendly. Furthermore, your ₹10,000 payment will be automatically credited and deducted when you enroll in the Producer Transformation Path program!'
+      a: 'Schedule immediately via Calendly upon payment. If you decide to join the Producer Transformation Path, the ₹10,000 consultation fee will be deducted from the course fee.'
     },
     {
       q: 'How does the ₹10,000 consultation credit work?',
@@ -362,9 +371,11 @@ function HomeContent() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {COURSES.map((course) => {
                 const isSelected = selectedCourseId === course.id;
-                const isDisabled = !!course.disabled;
+                const isCallConsultation = course.id === 'call-consultation';
+                const hasPaidConsultation = !!currentUser?.hasPaidConsultation;
+                const isDisabled = !!course.disabled || (isCallConsultation && hasPaidConsultation);
                 const isCourseProducer = course.id === 'producer-transformation' || course.id === 'bootcamp';
-                const hasCredit = isCourseProducer && !!currentUser?.hasPaidConsultation;
+                const hasCredit = isCourseProducer && hasPaidConsultation;
 
                 return (
                   <div
@@ -419,7 +430,7 @@ function HomeContent() {
                           border: 'none',
                           letterSpacing: '0.5px'
                         }}>
-                          {course.badge}
+                          {isCallConsultation && hasPaidConsultation ? 'ALREADY BOOKED' : course.badge}
                         </div>
                       )}
                       {hasCredit && (
@@ -460,12 +471,17 @@ function HomeContent() {
                     </p>
 
                     {/* Features list */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '6px', marginBottom: '16px' }}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: course.id === 'call-consultation' ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))',
+                      gap: '8px',
+                      marginBottom: '16px'
+                    }}>
                       {course.features.slice(0, 5).map((feat, idx) => (
                         <div key={idx} style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
+                          alignItems: 'flex-start',
+                          gap: '7px',
                           fontSize: '12px',
                           color: isDisabled ? '#64748b' : '#334155'
                         }}>
@@ -473,9 +489,11 @@ function HomeContent() {
                             width: '4px',
                             height: '4px',
                             borderRadius: '0px',
-                            backgroundColor: isDisabled ? '#94a3b8' : '#e2b13c'
+                            backgroundColor: isDisabled ? '#94a3b8' : '#e2b13c',
+                            marginTop: '6px',
+                            flexShrink: 0
                           }} />
-                          <span>{feat}</span>
+                          <span style={{ lineHeight: 1.45 }}>{feat}</span>
                         </div>
                       ))}
                     </div>
@@ -520,15 +538,27 @@ function HomeContent() {
                           )}
 
                           {/* Specific note that taxes apply additionally */}
-                          <span style={{
-                            fontSize: '11px',
-                            color: '#b8871b',
-                            fontWeight: 600,
-                            backgroundColor: 'rgba(226, 177, 60, 0.12)',
-                            padding: '3px 7px'
-                          }}>
-                            + Taxes apply additionally
-                          </span>
+                          {course.id === 'call-consultation' ? (
+                            <span style={{
+                              fontSize: '11px',
+                              color: '#15803d',
+                              fontWeight: 600,
+                              backgroundColor: 'rgba(21, 128, 61, 0.12)',
+                              padding: '3px 7px'
+                            }}>
+                              No Tax
+                            </span>
+                          ) : (
+                            <span style={{
+                              fontSize: '11px',
+                              color: '#b8871b',
+                              fontWeight: 600,
+                              backgroundColor: 'rgba(226, 177, 60, 0.12)',
+                              padding: '3px 7px'
+                            }}>
+                              + Taxes apply additionally
+                            </span>
+                          )}
                         </div>
 
                         {/* Select radio */}
@@ -549,7 +579,7 @@ function HomeContent() {
                               backgroundColor: '#e2e8f0',
                               borderRadius: '0px'
                             }}>
-                              Unselectable
+                              {isCallConsultation && hasPaidConsultation ? 'Booked' : 'Unselectable'}
                             </span>
                           ) : (
                             <>
@@ -575,9 +605,7 @@ function HomeContent() {
                         fontStyle: 'italic',
                         marginTop: '8px'
                       }}>
-                        {course.id === 'call-consultation'
-                          ? '*Schedule immediately via Calendly upon payment. ₹10,000 credited if joining Producer Transformation Path.'
-                          : '*18% GST will be calculated & shown in right-side Enrollment Summary.'}
+                        *18% GST will be calculated & shown in right-side Enrollment Summary.
                       </div>
                     </div>
                   </div>
@@ -760,8 +788,10 @@ function HomeContent() {
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0f172a', marginBottom: '8px' }}>
-                    <span>Additional Tax (18% GST):</span>
-                    <span style={{ fontWeight: 600, color: '#b8871b' }}>+₹{taxAmount.toLocaleString('en-IN')}</span>
+                    <span>{isConsultationSelected ? 'Tax:' : 'Additional Tax (18% GST):'}</span>
+                    <span style={{ fontWeight: 600, color: isConsultationSelected ? '#15803d' : '#b8871b' }}>
+                      {isConsultationSelected ? '₹0 (No Tax)' : `+₹${taxAmount.toLocaleString('en-IN')}`}
+                    </span>
                   </div>
 
                   <div style={{
