@@ -344,10 +344,6 @@ function HomeContent() {
             <span>Book Slot on Calendly</span>
             <ExternalLink size={12} />
           </a>
-
-          <span style={{ color: '#a16207', fontSize: '12px' }}>
-            (Consultation credit active: Producer Transformation Path is discounted by {pricing.creditText} to <strong>{pricing.courseDiscountedText}</strong>)
-          </span>
         </div>
       )}
 
