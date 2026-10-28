@@ -11,9 +11,12 @@ import {
   CheckCircle2,
   Loader2,
   User,
-  Sparkles
+  Sparkles,
+  Calendar,
+  ExternalLink
 } from 'lucide-react';
 import { COURSES, getCourseById } from '@/lib/courses';
+import { getPricing } from '@/lib/pricing';
 import AuthModal from '@/components/AuthModal';
 
 function getFriendlyErrorMessage(rawError?: string | null): string {
@@ -144,20 +147,21 @@ function HomeContent() {
     };
   }, []);
 
+  const pricing = getPricing();
   const selectedCourse = getCourseById(selectedCourseId) || COURSES[0];
   const isProducerCourse = selectedCourseId === 'producer-transformation' || selectedCourseId === 'bootcamp';
   const hasConsultationCredit = isProducerCourse && !!currentUser?.hasPaidConsultation;
 
   // Base fee calculation
   const rawBaseFee = selectedCourse.price;
-  const effectiveBaseFee = hasConsultationCredit ? 149000 : rawBaseFee;
+  const effectiveBaseFee = hasConsultationCredit ? pricing.courseDiscountedPrice : rawBaseFee;
 
-  // 18% Tax added to right side Enrollment Summary (Call Consultation is without tax)
+  // 18% Tax added to right side Enrollment Summary (Discovery Call is without tax)
   const isConsultationSelected = selectedCourseId === 'call-consultation';
   const taxAmount = isConsultationSelected ? 0 : Math.round(effectiveBaseFee * 0.18);
   const totalPayable = effectiveBaseFee + taxAmount;
 
-  // Auto-switch away from Call Consultation if user has already booked it
+  // Auto-switch away from Discovery Call if user has already booked it
   useEffect(() => {
     if (currentUser?.hasPaidConsultation && selectedCourseId === 'call-consultation') {
       setSelectedCourseId('producer-transformation');
@@ -246,18 +250,22 @@ function HomeContent() {
     }
   };
 
+  const calendlyDirectUrl = currentUser?.email
+    ? `https://calendly.com/musictutorship/new-meeting?name=${encodeURIComponent(currentUser.name || '')}&email=${encodeURIComponent(currentUser.email)}`
+    : 'https://calendly.com/musictutorship/new-meeting';
+
   const faqs = [
     {
       q: 'Which payment methods are accepted?',
       a: 'We accept all major payment methods including UPI (Google Pay, PhonePe, Paytm), Credit Cards (Visa, MasterCard, RuPay), Debit Cards, and NetBanking across all major Indian banks.'
     },
     {
-      q: 'What happens after completing Call Consultation payment?',
-      a: 'Schedule immediately via Calendly upon payment. If you decide to join the Producer Transformation Path, the ₹10,000 consultation fee will be deducted from the course fee.'
+      q: 'What happens after completing Discovery Call payment?',
+      a: `Schedule immediately via Calendly upon payment. If you decide to join the Producer Transformation Path, the ${pricing.creditText} Discovery Call fee will be deducted from the course fee.`
     },
     {
-      q: 'How does the ₹10,000 consultation credit work?',
-      a: 'When you log in with the email used for your Call Consultation, the Producer Transformation Path program fee automatically reduces from ₹1,59,000 to ₹1,49,000 (+ 18% tax), giving you full credit for your consultation fee.'
+      q: `How does the ${pricing.creditText} Discovery Call credit work?`,
+      a: `When you log in with the email used for your Discovery Call, the Producer Transformation Path program fee automatically reduces from ${pricing.coursePriceText} to ${pricing.courseDiscountedText} (+ 18% tax), giving you full credit for your consultation fee.`
     },
     {
       q: 'What happens after completing the course fee payment?',
@@ -294,23 +302,51 @@ function HomeContent() {
         </div>
       )}
 
-      {/* Consultation Credit Recognition Banner */}
+      {/* Discovery Call Paid & Calendly Slot Booking Banner */}
       {currentUser?.hasPaidConsultation && (
         <div style={{
           backgroundColor: '#fefbf3',
           borderBottom: '1px solid #fde68a',
-          padding: '12px 24px',
-          textAlign: 'center',
-          color: '#854d0e',
-          fontSize: '13px',
+          padding: '14px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '8px'
+          flexWrap: 'wrap',
+          gap: '12px',
+          fontSize: '13px',
+          color: '#854d0e'
         }}>
-          <Sparkles size={16} style={{ color: '#b8871b' }} />
-          <span>
-            <strong>Consultation Credit Recognized:</strong> Since you already paid ₹10,000 for Call Consultation, the Producer Transformation Path is discounted by ₹10,000 to <strong>₹1,49,000</strong> (+ 18% Tax).
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={16} style={{ color: '#b8871b', flexShrink: 0 }} />
+            <span>
+              <strong>Discovery Call Paid:</strong> Ready to choose your 1-on-1 strategy session slot?
+            </span>
+          </div>
+
+          <a
+            href={calendlyDirectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              backgroundColor: '#b8871b',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '12px',
+              textDecoration: 'none',
+              borderRadius: '0px'
+            }}
+          >
+            <Calendar size={13} />
+            <span>Book / Reschedule Slot on Calendly</span>
+            <ExternalLink size={12} />
+          </a>
+
+          <span style={{ color: '#a16207', fontSize: '12px' }}>
+            (Consultation credit active: Producer Transformation Path is discounted by {pricing.creditText} to <strong>{pricing.courseDiscountedText}</strong>)
           </span>
         </div>
       )}
@@ -389,14 +425,18 @@ function HomeContent() {
                     style={{
                       padding: '24px',
                       cursor: isDisabled ? 'not-allowed' : 'pointer',
-                      opacity: isDisabled ? 0.6 : 1,
+                      opacity: isDisabled && !isCallConsultation ? 0.6 : 1,
                       border: isSelected
                         ? '2px solid #e2b13c'
+                        : isCallConsultation && hasPaidConsultation
+                        ? '1.5px solid #e2b13c'
                         : isDisabled
                         ? '1px dashed #cbd5e1'
                         : '1px solid #e2e8f0',
                       backgroundColor: isSelected
                         ? '#fefbf3'
+                        : isCallConsultation && hasPaidConsultation
+                        ? '#ffffff'
                         : isDisabled
                         ? '#f8fafc'
                         : '#ffffff',
@@ -417,7 +457,7 @@ function HomeContent() {
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 700,
-                        color: isDisabled ? '#94a3b8' : '#b8871b',
+                        color: isDisabled && !isCallConsultation ? '#94a3b8' : '#b8871b',
                         letterSpacing: '0.5px'
                       }}>
                         {course.tag}
@@ -429,12 +469,16 @@ function HomeContent() {
                           fontWeight: 700,
                           padding: '3px 8px',
                           borderRadius: '0px',
-                          backgroundColor: isDisabled
+                          backgroundColor: isCallConsultation && hasPaidConsultation
+                            ? 'rgba(21, 128, 61, 0.12)'
+                            : isDisabled
                             ? 'rgba(100, 116, 139, 0.12)'
                             : course.popular
                             ? 'rgba(226, 177, 60, 0.15)'
                             : 'rgba(15, 23, 42, 0.06)',
-                          color: isDisabled
+                          color: isCallConsultation && hasPaidConsultation
+                            ? '#15803d'
+                            : isDisabled
                             ? '#64748b'
                             : course.popular
                             ? '#b8871b'
@@ -442,7 +486,7 @@ function HomeContent() {
                           border: 'none',
                           letterSpacing: '0.5px'
                         }}>
-                          {isCallConsultation && hasPaidConsultation ? 'ALREADY BOOKED' : course.badge}
+                          {isCallConsultation && hasPaidConsultation ? 'PAID & CONFIRMED' : course.badge}
                         </div>
                       )}
                     </div>
@@ -450,13 +494,13 @@ function HomeContent() {
                     <h3 className="course-card-title" style={{
                       fontSize: '17px',
                       fontWeight: 700,
-                      color: isDisabled ? '#475569' : '#0f172a',
+                      color: isDisabled && !isCallConsultation ? '#475569' : '#0f172a',
                       marginBottom: '2px'
                     }}>
                       {course.title}
                     </h3>
                     <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
-                      {course.subtitle} • {course.duration}
+                      {course.subtitle ? `${course.subtitle} • ${course.duration}` : course.duration}
                     </p>
 
                     {/* Features list */}
@@ -472,13 +516,13 @@ function HomeContent() {
                           alignItems: 'flex-start',
                           gap: '7px',
                           fontSize: '12px',
-                          color: isDisabled ? '#64748b' : '#334155'
+                          color: isDisabled && !isCallConsultation ? '#64748b' : '#334155'
                         }}>
                           <div style={{
                             width: '4px',
                             height: '4px',
                             borderRadius: '0px',
-                            backgroundColor: isDisabled ? '#94a3b8' : '#e2b13c',
+                            backgroundColor: isDisabled && !isCallConsultation ? '#94a3b8' : '#e2b13c',
                             marginTop: '6px',
                             flexShrink: 0
                           }} />
@@ -504,18 +548,20 @@ function HomeContent() {
                           {hasCredit ? (
                             <>
                               <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
-                                ₹1,49,000
+                                {pricing.courseDiscountedText}
                               </span>
                               <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
-                                ₹1,59,000
+                                {pricing.coursePriceText}
                               </span>
-                              <span style={{ fontSize: '12px', color: '#cbd5e1', textDecoration: 'line-through' }}>
-                                ₹1,70,000
-                              </span>
+                              {course.originalPrice && (
+                                <span style={{ fontSize: '12px', color: '#cbd5e1', textDecoration: 'line-through' }}>
+                                  ₹{course.originalPrice.toLocaleString('en-IN')}
+                                </span>
+                              )}
                             </>
                           ) : (
                             <>
-                              <span style={{ fontSize: '22px', fontWeight: 800, color: isDisabled ? '#64748b' : '#0f172a' }}>
+                              <span style={{ fontSize: '22px', fontWeight: 800, color: isDisabled && !isCallConsultation ? '#64748b' : '#0f172a' }}>
                                 ₹{course.price.toLocaleString('en-IN')}
                               </span>
                               {course.originalPrice && (
@@ -550,16 +596,27 @@ function HomeContent() {
                           )}
                         </div>
 
-                        {/* Select radio */}
+                        {/* Select radio or status badge */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px',
                           fontSize: '12px',
                           fontWeight: 600,
-                          color: isDisabled ? '#94a3b8' : isSelected ? '#000000' : '#64748b'
+                          color: isDisabled && !isCallConsultation ? '#94a3b8' : isSelected ? '#000000' : '#64748b'
                         }}>
-                          {isDisabled ? (
+                          {isCallConsultation && hasPaidConsultation ? (
+                            <span style={{
+                              fontSize: '11px',
+                              color: '#15803d',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              backgroundColor: 'rgba(21, 128, 61, 0.10)',
+                              borderRadius: '0px'
+                            }}>
+                              ✓ Paid
+                            </span>
+                          ) : isDisabled ? (
                             <span style={{
                               fontSize: '11px',
                               color: '#64748b',
@@ -568,7 +625,7 @@ function HomeContent() {
                               backgroundColor: '#e2e8f0',
                               borderRadius: '0px'
                             }}>
-                              {isCallConsultation && hasPaidConsultation ? 'Booked' : 'Unselectable'}
+                              Unselectable
                             </span>
                           ) : (
                             <>
@@ -587,14 +644,56 @@ function HomeContent() {
                         </div>
                       </div>
 
-                      {/* Small Footer Text */}
-                      <div style={{
-                        fontSize: '11px',
-                        color: '#64748b',
-                        fontStyle: 'italic',
-                        marginTop: '8px'
-                      }}>
-                      </div>
+                      {/* Direct Calendly Slot Booking Hub inside Card */}
+                      {isCallConsultation && hasPaidConsultation && (
+                        <div style={{
+                          marginTop: '14px',
+                          padding: '12px 14px',
+                          backgroundColor: '#fefbf3',
+                          border: '1.5px solid #e2b13c',
+                          borderRadius: '0px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '10px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle2 size={16} style={{ color: '#15803d', flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>
+                                Discovery Call Confirmed
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                Book or change your session time anytime
+                              </div>
+                            </div>
+                          </div>
+
+                          <a
+                            href={calendlyDirectUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px 16px',
+                              backgroundColor: '#b8871b',
+                              color: '#ffffff',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              textDecoration: 'none',
+                              borderRadius: '0px'
+                            }}
+                          >
+                            <Calendar size={13} />
+                            <span>Book Calendly Slot</span>
+                            <ExternalLink size={12} />
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -711,8 +810,8 @@ function HomeContent() {
                       backgroundColor: 'rgba(21, 128, 61, 0.08)',
                       padding: '4px 8px'
                     }}>
-                      <span>Consultation Credit Paid:</span>
-                      <span>-₹10,000</span>
+                      <span>Discovery Call Credit Paid:</span>
+                      <span>-{pricing.creditText}</span>
                     </div>
                   )}
 

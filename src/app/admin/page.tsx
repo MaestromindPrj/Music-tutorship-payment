@@ -33,6 +33,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { PaymentRecord, StudentRegistration } from '@/types';
+import { getPricing } from '@/lib/pricing';
 
 interface PaymentWithReg extends PaymentRecord {
   registration?: StudentRegistration | null;
@@ -1361,7 +1362,7 @@ export default function AdminPage() {
                                 whiteSpace: 'nowrap'
                               }}>
                                 <Sparkles size={11} />
-                                <span>Paid (₹10,000 Credit Active)</span>
+                                <span>Paid ({getPricing().creditText} Credit Active)</span>
                               </span>
                             ) : (
                               <span style={{ fontSize: '11px', color: '#64748b' }}>

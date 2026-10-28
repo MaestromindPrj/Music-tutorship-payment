@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPayUConfig, generatePayUHash, generateTxnId } from '@/lib/payu';
 import { getCourseById } from '@/lib/courses';
+import { getPricing } from '@/lib/pricing';
 import { savePayment } from '@/lib/db';
 import { hasUserPaidConsultation } from '@/lib/auth';
 import { PayUInitiatePayload, PayUFormData } from '@/types';
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.trim().toLowerCase();
     const course = getCourseById(courseId);
+    const pricing = getPricing();
     
     // Check consultation payment status for this email
     const hasConsultationCredit = await hasUserPaidConsultation(cleanEmail);
@@ -30,14 +32,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let basePrice = course ? course.price : 159000;
+    let basePrice = course ? course.price : pricing.coursePrice;
     if ((courseId === 'producer-transformation' || courseId === 'bootcamp') && hasConsultationCredit) {
-      basePrice = 149000; // 1,59,000 - 10,000 consultation credit
+      basePrice = pricing.courseDiscountedPrice;
     } else if (courseId === 'call-consultation') {
-      basePrice = 1;
+      basePrice = pricing.consultationPrice;
     }
 
-    // Call consultation is ₹1 without tax; courses have 18% tax
+    // Call consultation is without tax; courses have 18% tax
     const isCallConsultation = courseId === 'call-consultation';
     const taxAmount = isCallConsultation ? 0 : Math.round(basePrice * 0.18);
     const totalAmount = basePrice + taxAmount;

@@ -72,7 +72,12 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = (status?.toLowerCase() === 'success' || status?.toLowerCase() === 'captured') && isVerified;
 
-    if (isSuccess && (udf1 === 'call-consultation' || productinfo?.toLowerCase().includes('consultation')) && email) {
+    const isConsultationTxn =
+      udf1 === 'call-consultation' ||
+      productinfo?.toLowerCase().includes('consultation') ||
+      productinfo?.toLowerCase().includes('discovery');
+
+    if (isSuccess && isConsultationTxn && email) {
       await markConsultationPaid(email);
     }
 
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
     const origin = req.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
     if (isSuccess) {
-      if (udf1 === 'call-consultation' || productinfo?.toLowerCase().includes('consultation')) {
+      if (isConsultationTxn) {
         return NextResponse.redirect(new URL(`/confirmation?txnid=${encodeURIComponent(txnid)}`, origin), 303);
       }
       // Redirect to the mandatory registration form after payment

@@ -1,7 +1,7 @@
 export interface Course {
   id: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   badge?: string;
   badgeColor?: string;
   tag: string;

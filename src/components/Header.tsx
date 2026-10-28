@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, LogOut, ExternalLink } from 'lucide-react';
+import { User, LogOut, ExternalLink, Calendar } from 'lucide-react';
 import AuthModal from './AuthModal';
 
 export default function Header() {
@@ -131,7 +131,34 @@ export default function Header() {
             ) : (
               <>
                 {currentUser ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {currentUser.hasPaidConsultation && (
+                      <a
+                        href={`https://calendly.com/musictutorship/new-meeting?name=${encodeURIComponent(currentUser.name || '')}&email=${encodeURIComponent(currentUser.email)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="header-calendly-btn"
+                        title="Book or reschedule your Discovery Call slot on Calendly"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: '#b8871b',
+                          backgroundColor: 'rgba(226, 177, 60, 0.12)',
+                          border: '1px solid rgba(226, 177, 60, 0.4)',
+                          padding: '5px 10px',
+                          textDecoration: 'none',
+                          borderRadius: '0px'
+                        }}
+                      >
+                        <Calendar size={13} />
+                        <span className="btn-text-full">Book Discovery Call</span>
+                        <span className="btn-text-mobile">Book Slot</span>
+                      </a>
+                    )}
+
                     <div className="header-user-badge">
                       <User size={14} style={{ color: '#b8871b', flexShrink: 0 }} />
                       <span className="header-user-email">

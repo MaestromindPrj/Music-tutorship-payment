@@ -14,10 +14,12 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { PaymentRecord, StudentRegistration } from '@/types';
+import { getPricing } from '@/lib/pricing';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const txnid = searchParams.get('txnid') || '';
+  const pricing = getPricing();
 
   const [isLoading, setIsLoading] = useState(true);
   const [payment, setPayment] = useState<PaymentRecord | null>(null);
@@ -36,9 +38,10 @@ function ConfirmationContent() {
 
             const isConsultation =
               data.payment.courseId === 'call-consultation' ||
-              data.payment.courseName?.toLowerCase().includes('consultation');
+              data.payment.courseName?.toLowerCase().includes('consultation') ||
+              data.payment.courseName?.toLowerCase().includes('discovery');
 
-            // If Call Consultation, mark as paid in server & local storage
+            // If Discovery Call / Consultation, mark as paid in server & local storage
             if (isConsultation && data.payment.email) {
               fetch('/api/auth/consultation-status', {
                 method: 'POST',
@@ -103,7 +106,8 @@ function ConfirmationContent() {
 
   const isConsultation =
     payment?.courseId === 'call-consultation' ||
-    payment?.courseName?.toLowerCase().includes('consultation');
+    payment?.courseName?.toLowerCase().includes('consultation') ||
+    payment?.courseName?.toLowerCase().includes('discovery');
 
   const calendlyUrl = payment?.email
     ? `https://calendly.com/musictutorship/new-meeting?name=${encodeURIComponent(payment.studentName || '')}&email=${encodeURIComponent(payment.email || '')}`
@@ -137,11 +141,11 @@ function ConfirmationContent() {
         </div>
 
         <span className="section-overline" style={{ backgroundColor: 'rgba(21, 128, 61, 0.10)', color: '#15803d', border: 'none' }}>
-          {isConsultation ? 'CONSULTATION BOOKING CONFIRMED' : 'ENROLLMENT CONFIRMED'}
+          {isConsultation ? 'DISCOVERY CALL BOOKING CONFIRMED' : 'ENROLLMENT CONFIRMED'}
         </span>
 
         <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-          {isConsultation ? 'Call Consultation Booked!' : 'Welcome to Music Tutorship!'}
+          {isConsultation ? 'Discovery Call Booked!' : 'Welcome to Music Tutorship!'}
         </h1>
         <p style={{ color: '#64748b', fontSize: '14px', maxWidth: '520px', margin: '0 auto', lineHeight: 1.6 }}>
           Thank you <strong style={{ color: '#0f172a' }}>{registration?.fullName || payment?.studentName || 'Student'}</strong>. Your payment has been received successfully.
@@ -208,7 +212,7 @@ function ConfirmationContent() {
         </div>
       </div>
 
-      {/* Calendly Scheduling Box for Call Consultation */}
+      {/* Calendly Scheduling Box for Discovery Call */}
       {isConsultation && (
         <div className="no-print clean-card" style={{
           padding: '24px',
@@ -219,7 +223,7 @@ function ConfirmationContent() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <Calendar size={20} style={{ color: '#b8871b' }} />
             <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
-              Schedule Your 1-on-1 Consultation via Calendly
+              Schedule Your 1-on-1 Discovery Call via Calendly
             </h3>
           </div>
           <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6, marginBottom: '16px' }}>
@@ -251,7 +255,7 @@ function ConfirmationContent() {
             </a>
           </div>
 
-          {/* Consultation Credit Notice */}
+          {/* Discovery Call Credit Notice */}
           <div style={{
             backgroundColor: '#ffffff',
             border: '1px solid #fde68a',
@@ -262,7 +266,7 @@ function ConfirmationContent() {
           }}>
             <Sparkles size={18} style={{ color: '#b8871b', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '12px', color: '#854d0e', lineHeight: 1.5 }}>
-              <strong>₹10,000 Credit Saved:</strong> If you decide to join the <strong>Producer Transformation Path</strong>, the ₹10,000 consultation fee will be deducted from the course fee (reducing ₹1,59,000 to ₹1,49,000 + 18% Tax) when logged in with <strong>{payment?.email}</strong>.
+              <strong>{pricing.creditText} Credit Saved:</strong> If you decide to join the <strong>Producer Transformation Path</strong>, the {pricing.creditText} Discovery Call fee will be deducted from the course fee (reducing {pricing.coursePriceText} to {pricing.courseDiscountedText} + 18% Tax) when logged in with <strong>{payment?.email}</strong>.
               <div style={{ marginTop: '8px' }}>
                 <Link
                   href="/"
@@ -275,7 +279,7 @@ function ConfirmationContent() {
                     gap: '4px'
                   }}
                 >
-                  <span>Proceed to Producer Transformation Path (Save ₹10,000)</span>
+                  <span>Proceed to Producer Transformation Path (Save {pricing.creditText})</span>
                   <ArrowRight size={13} />
                 </Link>
               </div>
