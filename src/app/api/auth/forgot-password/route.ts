@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = resetPassword(email, newPassword);
+    const result = await resetPassword(email, newPassword);
     if (!result.success) {
       return NextResponse.json(
         { error: result.error || 'Failed to reset password' },

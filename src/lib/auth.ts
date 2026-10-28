@@ -1,4 +1,11 @@
-import { getPaymentByTxnId } from './db';
+import {
+  neonFindUserByEmail,
+  neonSaveUser,
+  neonUpdateUserPassword,
+  neonMarkConsultationPaid,
+  neonGetAllUsers,
+  neonUpdateUserLastLogin
+} from './neon';
 
 export interface UserAccount {
   id: string;
@@ -7,6 +14,7 @@ export interface UserAccount {
   password: string;
   hasPaidConsultation: boolean;
   createdAt: string;
+  lastLoginAt?: string;
 }
 
 // In-memory persistent user registry
@@ -41,12 +49,32 @@ export function validatePassword(password: string): { isValid: boolean; error?: 
   return { isValid: true };
 }
 
-export function findUserByEmail(email: string): UserAccount | undefined {
+export async function findUserByEmail(email: string): Promise<UserAccount | undefined> {
   const cleanEmail = email.trim().toLowerCase();
-  return userStore.get(cleanEmail);
+  const cached = userStore.get(cleanEmail);
+  if (cached) return cached;
+
+  const dbUser = await neonFindUserByEmail(cleanEmail).catch((e) => {
+    console.warn('Neon findUserByEmail note:', e);
+    return null;
+  });
+
+  if (dbUser) {
+    userStore.set(cleanEmail, dbUser);
+    if (dbUser.hasPaidConsultation) {
+      consultationPaidEmails.add(cleanEmail);
+    }
+    return dbUser;
+  }
+
+  return undefined;
 }
 
-export function registerUser(email: string, password: string, name?: string): { success: boolean; user?: UserAccount; error?: string } {
+export async function registerUser(
+  email: string,
+  password: string,
+  name?: string
+): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
 
   if (!validateEmail(cleanEmail)) {
@@ -58,7 +86,9 @@ export function registerUser(email: string, password: string, name?: string): { 
     return { success: false, error: passValidation.error };
   }
 
-  if (userStore.has(cleanEmail)) {
+  // Check if user exists in cache or Neon DB
+  const existing = await findUserByEmail(cleanEmail);
+  if (existing) {
     return { success: false, error: 'An account with this email already exists. Please log in.' };
   }
 
@@ -73,17 +103,26 @@ export function registerUser(email: string, password: string, name?: string): { 
   };
 
   userStore.set(cleanEmail, newUser);
+
+  // Persist to Neon PostgreSQL
+  await neonSaveUser(newUser).catch((e) =>
+    console.warn('Neon PostgreSQL saveUser note:', e)
+  );
+
   return { success: true, user: newUser };
 }
 
-export function authenticateUser(email: string, password: string): { success: boolean; user?: UserAccount; error?: string } {
+export async function authenticateUser(
+  email: string,
+  password: string
+): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
 
   if (!validateEmail(cleanEmail)) {
     return { success: false, error: 'Please enter a valid email address' };
   }
 
-  const existing = userStore.get(cleanEmail);
+  let existing = await findUserByEmail(cleanEmail);
   if (!existing) {
     // If not found, check if password meets criteria to create an account on the fly or prompt
     const passValidation = validatePassword(password);
@@ -91,7 +130,7 @@ export function authenticateUser(email: string, password: string): { success: bo
       return { success: false, error: passValidation.error };
     }
     // Auto-register first-time valid user for seamless onboarding
-    return registerUser(cleanEmail, password);
+    return await registerUser(cleanEmail, password);
   }
 
   if (existing.password !== password) {
@@ -103,10 +142,18 @@ export function authenticateUser(email: string, password: string): { success: bo
     existing.hasPaidConsultation = true;
   }
 
+  // Update last login in Neon
+  await neonUpdateUserLastLogin(cleanEmail).catch((e) =>
+    console.warn('neonUpdateUserLastLogin note:', e)
+  );
+
   return { success: true, user: existing };
 }
 
-export function resetPassword(email: string, newPassword: string): { success: boolean; error?: string } {
+export async function resetPassword(
+  email: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
 
   if (!validateEmail(cleanEmail)) {
@@ -118,28 +165,64 @@ export function resetPassword(email: string, newPassword: string): { success: bo
     return { success: false, error: passValidation.error };
   }
 
-  const existing = userStore.get(cleanEmail);
+  const existing = await findUserByEmail(cleanEmail);
   if (existing) {
     existing.password = newPassword;
+    userStore.set(cleanEmail, existing);
+    await neonUpdateUserPassword(cleanEmail, newPassword).catch((e) =>
+      console.warn('Neon updatePassword note:', e)
+    );
     return { success: true };
   } else {
     // Create new account with this new password
-    return registerUser(cleanEmail, newPassword);
+    return await registerUser(cleanEmail, newPassword);
   }
 }
 
-export function markConsultationPaid(email: string): void {
+export async function markConsultationPaid(email: string): Promise<void> {
   const cleanEmail = email.trim().toLowerCase();
   consultationPaidEmails.add(cleanEmail);
   const existing = userStore.get(cleanEmail);
   if (existing) {
     existing.hasPaidConsultation = true;
   }
+  await neonMarkConsultationPaid(cleanEmail).catch((e) =>
+    console.warn('Neon markConsultationPaid note:', e)
+  );
 }
 
-export function hasUserPaidConsultation(email: string): boolean {
+export async function hasUserPaidConsultation(email: string): Promise<boolean> {
   const cleanEmail = email.trim().toLowerCase();
   if (consultationPaidEmails.has(cleanEmail)) return true;
-  const existing = userStore.get(cleanEmail);
+
+  const existing = await findUserByEmail(cleanEmail);
   return !!existing?.hasPaidConsultation;
+}
+
+export async function getAllUsersForAdmin(): Promise<Array<{
+  id: string;
+  email: string;
+  name: string;
+  hasPaidConsultation: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+}>> {
+  const dbUsers = await neonGetAllUsers().catch((e) => {
+    console.warn('Neon getAllUsers error:', e);
+    return [];
+  });
+
+  if (dbUsers.length > 0) {
+    return dbUsers;
+  }
+
+  // Fallback to in-memory store
+  return Array.from(userStore.values()).map((u) => ({
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    hasPaidConsultation: u.hasPaidConsultation,
+    createdAt: u.createdAt,
+    lastLoginAt: u.createdAt
+  }));
 }

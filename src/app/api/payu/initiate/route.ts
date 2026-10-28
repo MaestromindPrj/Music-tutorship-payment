@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const course = getCourseById(courseId);
     
     // Check consultation payment status for this email
-    const hasConsultationCredit = hasUserPaidConsultation(cleanEmail);
+    const hasConsultationCredit = await hasUserPaidConsultation(cleanEmail);
 
     if (courseId === 'call-consultation' && hasConsultationCredit) {
       return NextResponse.json(

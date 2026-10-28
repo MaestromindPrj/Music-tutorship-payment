@@ -1,5 +1,17 @@
 import { PaymentRecord, StudentRegistration } from '@/types';
 import {
+  neonSavePayment,
+  neonUpdatePaymentStatus,
+  neonGetPaymentByTxnId,
+  neonSaveRegistration,
+  neonGetRegistrationByTxnId,
+  neonGetAllPayments,
+  neonGetAllRegistrations,
+  neonGetAdminStats,
+  PaymentWithRegistration,
+  AdminStats
+} from './neon';
+import {
   savePaymentToSheets,
   updatePaymentStatusInSheets,
   getPaymentFromSheets,
@@ -14,7 +26,7 @@ const memoryStore = {
 };
 
 // =========================================================================
-// Payment Operations (100% Google Sheets Storage + In-Memory Cache)
+// Payment Operations (Neon PostgreSQL + Cache + Google Sheets)
 // =========================================================================
 
 export async function savePayment(record: Omit<PaymentRecord, 'id'>): Promise<PaymentRecord> {
@@ -28,7 +40,12 @@ export async function savePayment(record: Omit<PaymentRecord, 'id'>): Promise<Pa
   // 1. Save in fast cache
   memoryStore.payments.set(cleanTxnid, savedRecord);
 
-  // 2. Persist to Google Sheets
+  // 2. Persist to Neon PostgreSQL (Primary Database)
+  await neonSavePayment(savedRecord).catch((e) =>
+    console.warn('Neon PostgreSQL savePayment note:', e)
+  );
+
+  // 3. Persist to Google Sheets (Backup)
   await savePaymentToSheets(savedRecord).catch((e) =>
     console.warn('Google Sheets savePayment note:', e)
   );
@@ -96,7 +113,18 @@ export async function updatePaymentStatus(
     memoryStore.payments.set(cleanTxnid, updatedRecord);
   }
 
-  // 2. Persist update to Google Sheets
+  // 2. Persist update to Neon PostgreSQL
+  const neonUpdated = await neonUpdatePaymentStatus(cleanTxnid, status, details).catch((e) => {
+    console.warn('Neon PostgreSQL updatePaymentStatus note:', e);
+    return null;
+  });
+
+  if (neonUpdated) {
+    memoryStore.payments.set(cleanTxnid, neonUpdated);
+    updatedRecord = neonUpdated;
+  }
+
+  // 3. Persist update to Google Sheets
   await updatePaymentStatusInSheets(cleanTxnid, status, details).catch((e) =>
     console.warn('Google Sheets updatePaymentStatus note:', e)
   );
@@ -112,7 +140,17 @@ export async function getPaymentByTxnId(txnid: string): Promise<PaymentRecord | 
   const cached = memoryStore.payments.get(cleanTxnid);
   if (cached) return cached;
 
-  // 2. Query Google Sheets
+  // 2. Query Neon PostgreSQL (Primary Database)
+  const neonPayment = await neonGetPaymentByTxnId(cleanTxnid).catch((e) => {
+    console.warn('Neon PostgreSQL getPaymentByTxnId note:', e);
+    return null;
+  });
+  if (neonPayment) {
+    memoryStore.payments.set(cleanTxnid, neonPayment);
+    return neonPayment;
+  }
+
+  // 3. Query Google Sheets (Fallback)
   const sheetPayment = await getPaymentFromSheets(cleanTxnid);
   if (sheetPayment) {
     memoryStore.payments.set(cleanTxnid, sheetPayment);
@@ -139,7 +177,12 @@ export async function saveStudentRegistration(
   // 1. Save in fast cache
   memoryStore.registrations.set(cleanTxnid, savedReg);
 
-  // 2. Persist to Google Sheets
+  // 2. Persist to Neon PostgreSQL
+  await neonSaveRegistration(savedReg).catch((e) =>
+    console.warn('Neon PostgreSQL saveStudentRegistration note:', e)
+  );
+
+  // 3. Persist to Google Sheets
   await saveRegistrationToSheets(savedReg).catch((e) =>
     console.warn('Google Sheets saveRegistration note:', e)
   );
@@ -155,7 +198,17 @@ export async function getRegistrationByTxnId(txnid: string): Promise<StudentRegi
   const cached = memoryStore.registrations.get(cleanTxnid);
   if (cached) return cached;
 
-  // 2. Query Google Sheets
+  // 2. Query Neon PostgreSQL
+  const neonReg = await neonGetRegistrationByTxnId(cleanTxnid).catch((e) => {
+    console.warn('Neon PostgreSQL getRegistrationByTxnId note:', e);
+    return null;
+  });
+  if (neonReg) {
+    memoryStore.registrations.set(cleanTxnid, neonReg);
+    return neonReg;
+  }
+
+  // 3. Query Google Sheets
   const sheetReg = await getRegistrationFromSheets(cleanTxnid);
   if (sheetReg) {
     memoryStore.registrations.set(cleanTxnid, sheetReg);
@@ -164,3 +217,50 @@ export async function getRegistrationByTxnId(txnid: string): Promise<StudentRegi
 
   return null;
 }
+
+// =========================================================================
+// Admin Dashboard Data Queries
+// =========================================================================
+
+export async function getAllPaymentsForAdmin(): Promise<PaymentWithRegistration[]> {
+  const neonPayments = await neonGetAllPayments().catch((e) => {
+    console.warn('Neon getAllPayments error:', e);
+    return [];
+  });
+
+  if (neonPayments.length > 0) {
+    return neonPayments;
+  }
+
+  // Fallback to cache if Neon is not yet connected
+  const payments: PaymentWithRegistration[] = [];
+  memoryStore.payments.forEach((payment) => {
+    const registration = memoryStore.registrations.get(payment.txnid) || null;
+    payments.push({
+      ...payment,
+      registration
+    });
+  });
+
+  return payments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function getAllRegistrationsForAdmin(): Promise<StudentRegistration[]> {
+  const neonRegs = await neonGetAllRegistrations().catch((e) => {
+    console.warn('Neon getAllRegistrations error:', e);
+    return [];
+  });
+
+  if (neonRegs.length > 0) {
+    return neonRegs;
+  }
+
+  return Array.from(memoryStore.registrations.values()).sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+  );
+}
+
+export async function getAdminDashboardStats(): Promise<AdminStats> {
+  return await neonGetAdminStats();
+}
+

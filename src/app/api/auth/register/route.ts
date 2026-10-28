@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = registerUser(email, password, name);
+    const result = await registerUser(email, password, name);
     if (!result.success || !result.user) {
       return NextResponse.json(
         { error: result.error || 'Registration failed' },

@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ hasPaidConsultation: false });
     }
 
-    const hasPaid = hasUserPaidConsultation(email);
+    const hasPaid = await hasUserPaidConsultation(email);
     return NextResponse.json({ hasPaidConsultation: hasPaid });
   } catch (err: any) {
     return NextResponse.json({ hasPaidConsultation: false, error: err?.message });
@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (markPaid) {
-      markConsultationPaid(email);
+      await markConsultationPaid(email);
     }
 
-    const hasPaid = hasUserPaidConsultation(email);
+    const hasPaid = await hasUserPaidConsultation(email);
     return NextResponse.json({ success: true, hasPaidConsultation: hasPaid });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });

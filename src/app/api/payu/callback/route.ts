@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     const isSuccess = (status?.toLowerCase() === 'success' || status?.toLowerCase() === 'captured') && isVerified;
 
     if (isSuccess && (udf1 === 'call-consultation' || productinfo?.toLowerCase().includes('consultation')) && email) {
-      markConsultationPaid(email);
+      await markConsultationPaid(email);
     }
 
     // Update Google Sheets & cache with verified transaction status

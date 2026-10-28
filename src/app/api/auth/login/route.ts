@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = authenticateUser(email, password);
+    const result = await authenticateUser(email, password);
     if (!result.success || !result.user) {
       return NextResponse.json(
         { error: result.error || 'Authentication failed' },

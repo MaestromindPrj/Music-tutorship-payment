@@ -1,11 +1,12 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { User, LogOut, CheckCircle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { User, LogOut, CheckCircle, ExternalLink } from 'lucide-react';
 import AuthModal from './AuthModal';
 
 export default function Header() {
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith('/admin');
   const [currentUser, setCurrentUser] = useState<{ email: string; name: string; hasPaidConsultation: boolean } | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
@@ -87,114 +88,153 @@ export default function Header() {
           </Link>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {currentUser ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  padding: '8px 12px',
-                  fontSize: '12px',
-                  color: '#0f172a'
+            {isAdminRoute ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  color: '#b8871b',
+                  backgroundColor: 'rgba(226, 177, 60, 0.12)',
+                  padding: '4px 10px',
+                  border: '1px solid rgba(226, 177, 60, 0.3)'
                 }}>
-                  <User size={14} style={{ color: '#b8871b' }} />
-                  <span style={{ fontWeight: 600, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {currentUser.email}
-                  </span>
-                  {currentUser.hasPaidConsultation && (
-                    <span style={{
-                      backgroundColor: 'rgba(21, 128, 61, 0.1)',
-                      color: '#15803d',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      padding: '2px 6px'
-                    }}>
-                      ₹10K CREDIT
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  onClick={handleLogout}
-                  title="Logout"
+                  ADMIN PORTAL
+                </span>
+                <Link
+                  href="/"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #e2e8f0',
-                    color: '#64748b',
-                    padding: '8px 12px',
+                    gap: '6px',
                     fontSize: '12px',
-                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: '#64748b',
+                    textDecoration: 'none',
+                    padding: '8px 14px',
+                    border: '1px solid #e2e8f0',
                     transition: 'all 0.2s'
                   }}
-                  onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#000000'; (e.currentTarget as HTMLElement).style.color = '#000000'; }}
-                  onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
+                  onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.color = '#000000'; (e.currentTarget as HTMLElement).style.borderColor = '#000000'; }}
+                  onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.color = '#64748b'; (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; }}
                 >
-                  <LogOut size={13} />
-                  <span>Logout</span>
-                </button>
+                  <ExternalLink size={13} />
+                  <span>VIEW USER SITE</span>
+                </Link>
               </div>
             ) : (
-              <button
-                onClick={() => setIsAuthOpen(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backgroundColor: 'transparent',
-                  color: '#111111',
-                  border: '1px solid #111111',
-                  padding: '10px 18px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = '#111111';
-                  (e.currentTarget as HTMLElement).style.color = '#ffffff';
-                }}
-                onMouseOut={(e) => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                  (e.currentTarget as HTMLElement).style.color = '#111111';
-                }}
-              >
-                <User size={14} />
-                <span>Login</span>
-              </button>
-            )}
+              <>
+                {currentUser ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      color: '#0f172a'
+                    }}>
+                      <User size={14} style={{ color: '#b8871b' }} />
+                      <span style={{ fontWeight: 600, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currentUser.email}
+                      </span>
+                      {currentUser.hasPaidConsultation && (
+                        <span style={{
+                          backgroundColor: 'rgba(21, 128, 61, 0.1)',
+                          color: '#15803d',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px'
+                        }}>
+                          ₹10K CREDIT
+                        </span>
+                      )}
+                    </div>
 
-            <Link
-              href="/lookup"
-              className="header-cta-btn"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#111111',
-                color: '#ffffff',
-                padding: '12px 24px',
-                fontSize: '12px',
-                fontWeight: 500,
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                textDecoration: 'none',
-                borderRadius: '0px',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s ease'
-              }}
-              onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#262626'; }}
-              onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#111111'; }}
-            >
-              RECEIPT LOOKUP
-            </Link>
+                    <button
+                      onClick={handleLogout}
+                      title="Logout"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #e2e8f0',
+                        color: '#64748b',
+                        padding: '8px 12px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#000000'; (e.currentTarget as HTMLElement).style.color = '#000000'; }}
+                      onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
+                    >
+                      <LogOut size={13} />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsAuthOpen(true)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      backgroundColor: 'transparent',
+                      color: '#111111',
+                      border: '1px solid #111111',
+                      padding: '10px 18px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = '#111111';
+                      (e.currentTarget as HTMLElement).style.color = '#ffffff';
+                    }}
+                    onMouseOut={(e) => {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                      (e.currentTarget as HTMLElement).style.color = '#111111';
+                    }}
+                  >
+                    <User size={14} />
+                    <span>Login</span>
+                  </button>
+                )}
+
+                <Link
+                  href="/lookup"
+                  className="header-cta-btn"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#111111',
+                    color: '#ffffff',
+                    padding: '12px 24px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    letterSpacing: '0.8px',
+                    textTransform: 'uppercase',
+                    textDecoration: 'none',
+                    borderRadius: '0px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#262626'; }}
+                  onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#111111'; }}
+                >
+                  RECEIPT LOOKUP
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
