@@ -27,7 +27,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Associated payment transaction not found' }, { status: 404 });
     }
 
-    // Validate the 9 required fields
     if (!fullName || fullName.trim().length < 2) {
       return NextResponse.json({ error: 'Please enter your Full Name' }, { status: 400 });
     }

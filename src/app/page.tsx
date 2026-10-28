@@ -83,12 +83,10 @@ function HomeContent() {
 
   const [selectedCourseId, setSelectedCourseId] = useState<string>('producer-transformation');
 
-  // Authenticated user state
   const [currentUser, setCurrentUser] = useState<{ email: string; name: string; hasPaidConsultation: boolean } | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authActionPrompt, setAuthActionPrompt] = useState<string>('');
 
-  // Student initial checkout info
   const [studentName, setStudentName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
@@ -98,12 +96,10 @@ function HomeContent() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
 
-  // Status notification if returning from failed payment
   const statusParam = searchParams.get('status');
   const errorParam = searchParams.get('error');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  // Sync user from localStorage & verify consultation credit
   useEffect(() => {
     const syncUser = async () => {
       try {
@@ -117,7 +113,6 @@ function HomeContent() {
               setStudentName(parsed.name);
             }
 
-            // Verify live consultation status from server
             try {
               const res = await fetch(`/api/auth/consultation-status?email=${encodeURIComponent(parsed.email)}`);
               const data = await res.json();
@@ -127,14 +122,12 @@ function HomeContent() {
                 localStorage.setItem('mt_user', JSON.stringify(updated));
               }
             } catch (e) {
-              // ignore
             }
           }
         } else {
           setCurrentUser(null);
         }
       } catch (e) {
-        // ignore
       }
     };
 
@@ -152,16 +145,13 @@ function HomeContent() {
   const isProducerCourse = selectedCourseId === 'producer-transformation' || selectedCourseId === 'bootcamp';
   const hasConsultationCredit = isProducerCourse && !!currentUser?.hasPaidConsultation;
 
-  // Base fee calculation
   const rawBaseFee = selectedCourse.price;
   const effectiveBaseFee = hasConsultationCredit ? pricing.courseDiscountedPrice : rawBaseFee;
 
-  // 18% Tax added to right side Enrollment Summary (Discovery Call is without tax)
   const isConsultationSelected = selectedCourseId === 'call-consultation';
   const taxAmount = isConsultationSelected ? 0 : Math.round(effectiveBaseFee * 0.18);
   const totalPayable = effectiveBaseFee + taxAmount;
 
-  // Auto-switch away from Discovery Call if user has already booked it
   useEffect(() => {
     if (currentUser?.hasPaidConsultation && selectedCourseId === 'call-consultation') {
       setSelectedCourseId('producer-transformation');
@@ -179,7 +169,6 @@ function HomeContent() {
     e.preventDefault();
     setFormError('');
 
-    // MANDATORY REQUIREMENT: Check whether user is logged in
     if (!currentUser) {
       setAuthActionPrompt('Email login is mandatory to proceed with fee payment. Please log in or sign up to continue.');
       setIsAuthModalOpen(true);
@@ -223,7 +212,6 @@ function HomeContent() {
 
       const data = await res.json();
       if (data.success && data.formData) {
-        // Submit directly to PayU live production payment gateway
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = data.formData.actionUrl || 'https://secure.payu.in/_payment';
@@ -283,7 +271,6 @@ function HomeContent() {
 
   return (
     <div style={{ paddingBottom: '60px' }}>
-      {/* Alert Banner for Payment Failure */}
       {(statusParam === 'failed' || statusParam === 'error') && (
         <div style={{
           backgroundColor: 'rgba(185, 28, 28, 0.08)',
@@ -302,7 +289,6 @@ function HomeContent() {
         </div>
       )}
 
-      {/* Discovery Call Paid & Calendly Slot Booking Banner */}
       {currentUser?.hasPaidConsultation && (
         <div style={{
           backgroundColor: '#fefbf3',
@@ -347,7 +333,6 @@ function HomeContent() {
         </div>
       )}
 
-      {/* Hero Section */}
       <section style={{ padding: '40px 0 24px 0', textAlign: 'center' }}>
         <div className="container">
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
@@ -366,9 +351,7 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* Main Payment Section: Options Selector + Checkout Form */}
       <section className="container" id="checkout-section">
-        {/* Step Indicator */}
         <div className="steps-nav">
           <div className="step-item active">
             <div className="step-number">1</div>
@@ -393,7 +376,6 @@ function HomeContent() {
         </div>
 
         <div className="grid-2">
-          {/* Left Column: Course & Consultation Selection Cards */}
           <div>
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
@@ -441,7 +423,6 @@ function HomeContent() {
                       userSelect: 'none'
                     }}
                   >
-                    {/* Top Tag & Badge Row */}
                     <div style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -499,7 +480,6 @@ function HomeContent() {
                       {course.subtitle ? `${course.subtitle} • ${course.duration}` : course.duration}
                     </p>
 
-                    {/* Features list */}
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: course.id === 'call-consultation' ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))',
@@ -527,7 +507,6 @@ function HomeContent() {
                       ))}
                     </div>
 
-                    {/* Price, Taxes Notice, and Radio Indicator */}
                     <div style={{
                       borderTop: '1px solid #e2e8f0',
                       paddingTop: '14px'
@@ -539,7 +518,6 @@ function HomeContent() {
                         flexWrap: 'wrap',
                         gap: '10px'
                       }}>
-                        {/* Amount & Tax indication */}
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                           {hasCredit ? (
                             <>
@@ -568,7 +546,6 @@ function HomeContent() {
                             </>
                           )}
 
-                          {/* Specific note that taxes apply additionally */}
                           {course.id === 'call-consultation' ? (
                             <span style={{
                               fontSize: '11px',
@@ -592,7 +569,6 @@ function HomeContent() {
                           )}
                         </div>
 
-                        {/* Select radio or status badge */}
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -640,7 +616,6 @@ function HomeContent() {
                         </div>
                       </div>
 
-                      {/* Direct Calendly Slot Booking Hub inside Card */}
                       {isCallConsultation && hasPaidConsultation && (
                         <div style={{
                           marginTop: '14px',
@@ -697,7 +672,6 @@ function HomeContent() {
             </div>
           </div>
 
-          {/* Right Column: Checkout Form & Summary */}
           <div>
             <div className="clean-card checkout-sticky-card" style={{ padding: '28px', position: 'sticky', top: '90px' }}>
               <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '20px' }}>
@@ -729,7 +703,6 @@ function HomeContent() {
               )}
 
               <form onSubmit={handleCheckout}>
-                {/* Name */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="studentName">
                     <span>Student Full Name *</span>
@@ -745,7 +718,6 @@ function HomeContent() {
                   />
                 </div>
 
-                {/* Email */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="email">
                     <span>Email Address *</span>
@@ -766,7 +738,6 @@ function HomeContent() {
                   />
                 </div>
 
-                {/* Phone */}
                 <div className="form-group">
                   <label className="form-label" htmlFor="phone">
                     <span>Phone Number (WhatsApp) *</span>
@@ -782,7 +753,6 @@ function HomeContent() {
                   />
                 </div>
 
-                {/* Fee Breakdown Card with explicit 18% Tax */}
                 <div style={{
                   backgroundColor: '#f8fafc',
                   border: '1px solid #e2e8f0',
@@ -842,7 +812,6 @@ function HomeContent() {
                   </div>
                 </div>
 
-                {/* Terms and Conditions Checkbox with Hyperlink */}
                 <div style={{
                   margin: '14px 0 16px 0',
                   padding: '12px 14px',
@@ -898,7 +867,6 @@ function HomeContent() {
                   </label>
                 </div>
 
-                {/* Submit Button */}
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -925,7 +893,6 @@ function HomeContent() {
                 </button>
               </form>
 
-              {/* Security Trust Indicator */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -944,7 +911,6 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* FAQ Section */}
       <section className="container" style={{ padding: '48px 24px 16px 24px' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
@@ -985,7 +951,6 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* Mandatory Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}

@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Set secure HTTP-only cookie for student session isolation
     response.cookies.set({
       name: USER_COOKIE_NAME,
       value: sessionToken,

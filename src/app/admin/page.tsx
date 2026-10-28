@@ -59,7 +59,6 @@ interface AdminStats {
 }
 
 export default function AdminPage() {
-  // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [adminEmail, setAdminEmail] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
@@ -68,7 +67,6 @@ export default function AdminPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Dashboard data state
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalRevenue: 0,
@@ -83,13 +81,11 @@ export default function AdminPage() {
   const [registrations, setRegistrations] = useState<StudentRegistration[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
 
-  // Navigation & filter state
   const [activeTab, setActiveTab] = useState<'payments' | 'registrations' | 'users'>('payments');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'PENDING' | 'FAILED'>('ALL');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'COURSE' | 'CONSULTATION'>('ALL');
 
-  // Modal state for student details view
   const [selectedStudentDetails, setSelectedStudentDetails] = useState<{
     payment: PaymentWithReg;
     registration?: StudentRegistration | null;
@@ -97,7 +93,6 @@ export default function AdminPage() {
 
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
-  // Add User Modal state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -110,7 +105,6 @@ export default function AdminPage() {
     password: string;
   } | null>(null);
 
-  // Edit User / Change Password Modal state
   const [editingUser, setEditingUser] = useState<{ id: string; name: string; email: string } | null>(null);
   const [editName, setEditName] = useState('');
   const [editPassword, setEditPassword] = useState('');
@@ -122,12 +116,10 @@ export default function AdminPage() {
     password?: string;
   } | null>(null);
 
-  // Check auth on mount
   useEffect(() => {
     checkAuth();
   }, []);
 
-  // Real-time auto-refresh every 5 seconds when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
     const interval = setInterval(() => {
@@ -318,7 +310,6 @@ export default function AdminPage() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // Filtered Payments
   const filteredPayments = useMemo(() => {
     return payments.filter((p) => {
       if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
@@ -344,7 +335,6 @@ export default function AdminPage() {
     });
   }, [payments, statusFilter, typeFilter, searchTerm]);
 
-  // Filtered Registrations
   const filteredRegistrations = useMemo(() => {
     return registrations.filter((r) => {
       if (searchTerm.trim()) {
@@ -362,7 +352,6 @@ export default function AdminPage() {
     });
   }, [registrations, searchTerm]);
 
-  // Filtered Users
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       if (searchTerm.trim()) {
@@ -375,7 +364,6 @@ export default function AdminPage() {
     });
   }, [users, searchTerm]);
 
-  // Export functions to CSV
   const exportPaymentsToCSV = () => {
     const headers = [
       'Transaction ID',
@@ -493,23 +481,18 @@ export default function AdminPage() {
     document.body.removeChild(link);
   };
 
-  // WhatsApp formatted share link for created student
   const whatsappShareUrl = createdUserSuccess
     ? `https://wa.me/?text=${encodeURIComponent(
         `Hello ${createdUserSuccess.name}!\n\nYour Music Tutorship Student Portal account has been created.\n\n🌐 Portal: https://payments.musictutorship.in\n📧 Email: ${createdUserSuccess.email}\n🔑 Password: ${createdUserSuccess.password}\n\nPlease log in to access your course materials and consultations.`
       )}`
     : '#';
 
-  // WhatsApp formatted share link for updated student credentials
   const whatsappEditShareUrl = editUserSuccess?.password
     ? `https://wa.me/?text=${encodeURIComponent(
         `Hello ${editUserSuccess.name}!\n\nYour Music Tutorship Student Portal credentials have been updated.\n\n🌐 Portal: https://payments.musictutorship.in\n📧 Email: ${editUserSuccess.email}\n🔑 New Password: ${editUserSuccess.password}\n\nPlease log in using your updated password.`
       )}`
     : '#';
 
-  // =========================================================================
-  // Screen 0: Initial Auth Verification Guard (Zero Flash)
-  // =========================================================================
   if (isAuthenticated === null) {
     return (
       <div style={{
@@ -527,9 +510,6 @@ export default function AdminPage() {
     );
   }
 
-  // =========================================================================
-  // Screen 1: Unauthenticated Admin Login
-  // =========================================================================
   if (isAuthenticated === false) {
     return (
       <div className="container" style={{ padding: '60px 24px', maxWidth: '440px' }}>
@@ -661,12 +641,8 @@ export default function AdminPage() {
     );
   }
 
-  // =========================================================================
-  // Screen 2: Authenticated Admin Dashboard with Sidebar Layout
-  // =========================================================================
   return (
     <div className="container admin-container" style={{ padding: '32px 32px 80px 32px', maxWidth: '1600px', width: '100%' }}>
-      {/* Admin Top Action Header */}
       <div className="admin-top-header" style={{
         display: 'flex',
         alignItems: 'center',
@@ -686,9 +662,7 @@ export default function AdminPage() {
           </p>
         </div>
 
-        {/* Top Controls */}
         <div className="admin-top-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* Refresh Button */}
           <button
             onClick={fetchDashboardData}
             disabled={isLoadingData}
@@ -705,7 +679,6 @@ export default function AdminPage() {
             <span>REFRESH</span>
           </button>
 
-          {/* Admin user identity */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -720,7 +693,6 @@ export default function AdminPage() {
             <span style={{ color: '#0f172a', fontWeight: 600 }}>{adminEmail}</span>
           </div>
 
-          {/* Logout Button */}
           <button
             onClick={handleLogout}
             style={{
@@ -743,16 +715,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Main Dashboard Layout with Sidebar */}
       <div className="admin-layout" style={{
         display: 'flex',
         gap: '24px',
         alignItems: 'flex-start',
         flexWrap: 'wrap'
       }}>
-        {/* =============================================================== */}
-        {/* SIDEBAR NAVIGATION */}
-        {/* =============================================================== */}
         <aside className="admin-sidebar" style={{ width: '270px', flexShrink: 0, minWidth: '240px' }}>
           <div className="clean-card" style={{ padding: '16px', marginBottom: '16px' }}>
             <div style={{
@@ -769,7 +737,6 @@ export default function AdminPage() {
             </div>
 
             <nav className="admin-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {/* Sidetab 1: Payments & Enrollments */}
               <button
                 onClick={() => setActiveTab('payments')}
                 className={`admin-tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
@@ -803,7 +770,6 @@ export default function AdminPage() {
                 </span>
               </button>
 
-              {/* Sidetab 2: Student KYC Details */}
               <button
                 onClick={() => setActiveTab('registrations')}
                 className={`admin-tab-btn ${activeTab === 'registrations' ? 'active' : ''}`}
@@ -837,7 +803,6 @@ export default function AdminPage() {
                 </span>
               </button>
 
-              {/* Sidetab 3: Logged In Users */}
               <button
                 onClick={() => setActiveTab('users')}
                 className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
@@ -872,7 +837,6 @@ export default function AdminPage() {
               </button>
             </nav>
 
-            {/* Sidebar Quick Action: Add User */}
             <div className="admin-sidebar-action" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
               <button
                 onClick={() => {
@@ -902,18 +866,13 @@ export default function AdminPage() {
           </div>
         </aside>
 
-        {/* =============================================================== */}
-        {/* MAIN DATA VIEW AREA */}
-        {/* =============================================================== */}
         <main className="admin-main" style={{ flex: 1, minWidth: 0, width: '100%' }}>
-          {/* Metric Overview Cards */}
           <div className="admin-metrics-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '16px',
             marginBottom: '24px'
           }}>
-            {/* Total Revenue */}
             <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
               <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Revenue
@@ -926,7 +885,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Successful Enrollments */}
             <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
               <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Successful Payments
@@ -939,7 +897,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Submitted KYC Profiles */}
             <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
               <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 KYC Registrations
@@ -952,7 +909,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Registered Users */}
             <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
               <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Student Accounts
@@ -966,7 +922,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Filter and Search Bar */}
           <div className="admin-toolbar" style={{
             display: 'flex',
             alignItems: 'center',
@@ -975,7 +930,6 @@ export default function AdminPage() {
             width: '100%',
             flexWrap: 'wrap'
           }}>
-            {/* Search Input */}
             <div className="admin-search-wrapper" style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
               <input
@@ -1001,7 +955,6 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* Filters for Payments */}
             {activeTab === 'payments' && (
               <div className="admin-filters-wrapper" style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
                 <select
@@ -1029,7 +982,6 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Right Action Buttons */}
             <div className="admin-action-buttons" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
               {activeTab === 'users' && (
                 <button
@@ -1082,9 +1034,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* =============================================================== */}
-          {/* TAB 1: Payments & Enrollments */}
-          {/* =============================================================== */}
           {activeTab === 'payments' && (
             <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
               <div className="admin-table-mobile-hint">Swipe horizontally to view full table →</div>
@@ -1118,7 +1067,6 @@ export default function AdminPage() {
 
                         return (
                           <tr key={p.txnid} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                            {/* Student */}
                             <td style={{ padding: '16px 18px' }}>
                               <div style={{ fontWeight: 700, color: '#0f172a' }}>
                                 {p.studentName || 'Student'}
@@ -1127,7 +1075,6 @@ export default function AdminPage() {
                               <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.phone}</div>
                             </td>
 
-                            {/* Program */}
                             <td style={{ padding: '16px 18px' }}>
                               <span style={{
                                 display: 'inline-block',
@@ -1145,12 +1092,10 @@ export default function AdminPage() {
                               </div>
                             </td>
 
-                            {/* Amount */}
                             <td style={{ padding: '16px 18px', fontWeight: 800, color: '#000000', whiteSpace: 'nowrap' }}>
                               ₹{Number(p.amount).toLocaleString('en-IN')}
                             </td>
 
-                            {/* Status */}
                             <td style={{ padding: '16px 18px' }}>
                               <span style={{
                                 display: 'inline-flex',
@@ -1178,7 +1123,6 @@ export default function AdminPage() {
                               </span>
                             </td>
 
-                            {/* Transaction ID */}
                             <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span>{p.txnid}</span>
@@ -1192,12 +1136,10 @@ export default function AdminPage() {
                               </div>
                             </td>
 
-                            {/* Date */}
                             <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
                               {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                             </td>
 
-                            {/* Actions */}
                             <td style={{ padding: '16px 18px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                               <button
                                 onClick={() => setSelectedStudentDetails({ payment: p, registration: p.registration })}
@@ -1218,9 +1160,6 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* =============================================================== */}
-          {/* TAB 2: Student KYC Details */}
-          {/* =============================================================== */}
           {activeTab === 'registrations' && (
             <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
               <div className="admin-table-mobile-hint">Swipe horizontally to view full table →</div>
@@ -1291,9 +1230,6 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* =============================================================== */}
-          {/* TAB 3: Logged In Users */}
-          {/* =============================================================== */}
           {activeTab === 'users' && (
             <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{
@@ -1421,9 +1357,6 @@ export default function AdminPage() {
         </main>
       </div>
 
-      {/* =================================================================== */}
-      {/* MODAL 1: ADD NEW USER (Direct from Admin + WhatsApp Share) */}
-      {/* =================================================================== */}
       {isAddUserOpen && (
         <div className="admin-modal-overlay" style={{
           position: 'fixed',
@@ -1470,7 +1403,6 @@ export default function AdminPage() {
               <X size={16} />
             </button>
 
-            {/* Header */}
             <div style={{ marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
                 STUDENT ACCESS PROVISIONING
@@ -1485,7 +1417,6 @@ export default function AdminPage() {
               </p>
             </div>
 
-            {/* View A: Success Box with WhatsApp Sharing */}
             {createdUserSuccess ? (
               <div>
                 <div style={{
@@ -1507,7 +1438,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* WhatsApp & Copy Action Buttons */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <a
                     href={whatsappShareUrl}
@@ -1558,7 +1488,6 @@ export default function AdminPage() {
                 </div>
               </div>
             ) : (
-              /* View B: User Creation Form */
               <form onSubmit={handleCreateUser}>
                 {addUserError && (
                   <div style={{
@@ -1661,9 +1590,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* =================================================================== */}
-      {/* MODAL: EDIT STUDENT / CHANGE PASSWORD */}
-      {/* =================================================================== */}
       {editingUser && (
         <div className="admin-modal-overlay" style={{
           position: 'fixed',
@@ -1710,7 +1636,6 @@ export default function AdminPage() {
               <X size={16} />
             </button>
 
-            {/* Header */}
             <div style={{ marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
                 ACCOUNT CREDENTIALS MANAGEMENT
@@ -1725,7 +1650,6 @@ export default function AdminPage() {
               </p>
             </div>
 
-            {/* Success View */}
             {editUserSuccess ? (
               <div>
                 <div style={{
@@ -1801,7 +1725,6 @@ export default function AdminPage() {
                 </div>
               </div>
             ) : (
-              /* Edit Form */
               <form onSubmit={handleUpdateUser}>
                 {editUserError && (
                   <div style={{
@@ -1912,9 +1835,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* =================================================================== */}
-      {/* MODAL 2: STUDENT DETAILS INSPECTION MODAL */}
-      {/* =================================================================== */}
       {selectedStudentDetails && (
         <div className="admin-modal-overlay" style={{
           position: 'fixed',
@@ -1939,7 +1859,6 @@ export default function AdminPage() {
             position: 'relative',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)'
           }}>
-            {/* Close Button */}
             <button
               onClick={() => setSelectedStudentDetails(null)}
               style={{
@@ -1960,7 +1879,6 @@ export default function AdminPage() {
               <X size={16} />
             </button>
 
-            {/* Modal Header */}
             <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
                 STUDENT ENROLLMENT RECORD
@@ -1973,7 +1891,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Payment Summary Box */}
             <div style={{
               backgroundColor: '#f8fafc',
               border: '1px solid #e2e8f0',
@@ -2027,7 +1944,6 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* KYC Profile Details */}
             <div>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>
                 Mandatory 9-Point Student KYC Details

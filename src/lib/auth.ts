@@ -21,19 +21,12 @@ export interface UserAccount {
   avatarUrl?: string;
 }
 
-// In-memory cache for ultra-fast session validation
 const userStore = new Map<string, UserAccount>();
 
-// Track emails that have paid consultation
 const consultationPaidEmails = new Set<string>();
 
-// User Session Token Secret
 const USER_SESSION_SECRET = process.env.USER_SESSION_SECRET || process.env.ADMIN_SECRET || 'music-tutorship-user-secret-2025';
 export const USER_COOKIE_NAME = 'mt_user_session';
-
-// =========================================================================
-// Cryptographic Password Hashing (OWASP scrypt standard)
-// =========================================================================
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -52,13 +45,8 @@ export function verifyPassword(password: string, storedHash: string): boolean {
       return false;
     }
   }
-  // Backward compatibility with legacy plaintext accounts if any
   return storedHash === password;
 }
-
-// =========================================================================
-// Student Session Management (Isolated from Admin)
-// =========================================================================
 
 export function createUserSessionToken(user: { id: string; email: string; name: string }): string {
   const payload = {
@@ -66,7 +54,7 @@ export function createUserSessionToken(user: { id: string; email: string; name: 
     email: user.email.toLowerCase(),
     name: user.name,
     role: 'student',
-    exp: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000
   };
   const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = crypto
@@ -105,10 +93,6 @@ export function verifyUserSessionToken(token?: string | null): {
   }
 }
 
-// =========================================================================
-// Validation Helpers
-// =========================================================================
-
 export function validateEmail(email: string): boolean {
   if (!email || typeof email !== 'string') return false;
   const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -124,10 +108,6 @@ export function validatePassword(password: string): { isValid: boolean; error?: 
   }
   return { isValid: true };
 }
-
-// =========================================================================
-// User Lookup & Core Registration
-// =========================================================================
 
 export async function findUserByEmail(email: string): Promise<UserAccount | undefined> {
   const cleanEmail = email.trim().toLowerCase();
@@ -150,9 +130,6 @@ export async function findUserByEmail(email: string): Promise<UserAccount | unde
   return undefined;
 }
 
-/**
- * Creates a student account directly from Admin Dashboard
- */
 export async function adminCreateUser(params: {
   email: string;
   password: string;
@@ -190,7 +167,6 @@ export async function adminCreateUser(params: {
     consultationPaidEmails.add(cleanEmail);
   }
 
-  // Persist to Neon PostgreSQL
   await neonSaveUser(newUser).catch((e) =>
     console.warn('Neon PostgreSQL saveUser note:', e)
   );
@@ -198,9 +174,6 @@ export async function adminCreateUser(params: {
   return { success: true, user: newUser };
 }
 
-/**
- * Updates an existing student account from Admin Dashboard (Password / Name)
- */
 export async function adminUpdateUser(params: {
   email: string;
   password?: string;
@@ -226,13 +199,11 @@ export async function adminUpdateUser(params: {
     hashedPassword = hashPassword(params.password);
   }
 
-  // Persist update to Neon PostgreSQL
   await neonUpdateUser(cleanEmail, {
     password: hashedPassword,
     name: params.name?.trim()
   });
 
-  // Update in-memory cache
   if (hashedPassword) existing.password = hashedPassword;
   if (params.name) existing.name = params.name.trim();
   userStore.set(cleanEmail, existing);
@@ -268,7 +239,6 @@ export async function authenticateUser(
     return { success: false, error: 'Incorrect password. Please verify and try again.' };
   }
 
-  // Automatic upgrade: If stored password was legacy plaintext, upgrade to scrypt hash immediately
   if (!existing.password.startsWith('scrypt:')) {
     const upgradedHash = hashPassword(password);
     existing.password = upgradedHash;
@@ -276,22 +246,16 @@ export async function authenticateUser(
     await neonUpdateUserPassword(cleanEmail, upgradedHash).catch(() => {});
   }
 
-  // Sync consultation status
   if (consultationPaidEmails.has(cleanEmail)) {
     existing.hasPaidConsultation = true;
   }
 
-  // Update last login in Neon
   await neonUpdateUserLastLogin(cleanEmail).catch((e) =>
     console.warn('neonUpdateUserLastLogin note:', e)
   );
 
   return { success: true, user: existing };
 }
-
-// =========================================================================
-// Consultation & Admin Operations
-// =========================================================================
 
 export async function markConsultationPaid(email: string): Promise<void> {
   const cleanEmail = email.trim().toLowerCase();
@@ -330,7 +294,6 @@ export async function getAllUsersForAdmin(): Promise<Array<{
     return dbUsers;
   }
 
-  // Fallback to in-memory store
   return Array.from(userStore.values()).map((u) => ({
     id: u.id,
     email: u.email,

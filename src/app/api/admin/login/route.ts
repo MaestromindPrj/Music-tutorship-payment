@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Set secure HTTP-only session cookie
     response.cookies.set({
       name: ADMIN_COOKIE_NAME,
       value: token,

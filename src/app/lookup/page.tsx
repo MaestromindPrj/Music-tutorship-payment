@@ -54,7 +54,6 @@ export default function LookupPage() {
         </p>
       </div>
 
-      {/* Search Input Card */}
       <div className="clean-card" style={{ padding: '24px', marginBottom: '24px' }}>
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1', minWidth: '220px' }}>
@@ -82,7 +81,6 @@ export default function LookupPage() {
         </form>
       </div>
 
-      {/* Error View */}
       {searched && error && (
         <div className="clean-card" style={{ padding: '28px', textAlign: 'center', borderColor: '#fecaca', backgroundColor: '#fef2f2' }}>
           <AlertCircle size={36} style={{ color: '#dc2626', margin: '0 auto 10px auto' }} />
@@ -95,7 +93,6 @@ export default function LookupPage() {
         </div>
       )}
 
-      {/* Results View */}
       {result && result.payment && (
         <div className="clean-card" style={{ padding: '28px' }}>
           <div style={{

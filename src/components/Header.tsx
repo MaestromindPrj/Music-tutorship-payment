@@ -22,7 +22,6 @@ export default function Header() {
           setCurrentUser(null);
         }
       } catch (e) {
-        // ignore
       }
     };
 
@@ -39,7 +38,6 @@ export default function Header() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch {
-      // ignore
     }
     localStorage.removeItem('mt_user');
     setCurrentUser(null);
@@ -57,7 +55,6 @@ export default function Header() {
         boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
       }}>
         <div className={`container header-container ${isAdminRoute ? 'header-admin-container' : ''}`}>
-          {/* Brand Logo & Title */}
           <Link href="/" className="header-brand" style={{
             display: 'flex',
             alignItems: 'center',

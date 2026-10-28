@@ -14,14 +14,12 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || 'music-tutorship-admin-secret-j
 
 export const ADMIN_COOKIE_NAME = 'mt_admin_session';
 
-/**
- * Creates a signed HMAC token for admin session
- */
+
 export function createAdminToken(email: string): string {
   const payload = {
     email,
     role: 'admin',
-    exp: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days validity
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000
   };
   const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = crypto
@@ -32,9 +30,7 @@ export function createAdminToken(email: string): string {
   return `${payloadB64}.${signature}`;
 }
 
-/**
- * Verifies the admin token HMAC signature and expiration
- */
+
 export function verifyAdminToken(token?: string | null): { valid: boolean; email?: string } {
   if (!token) return { valid: false };
 
@@ -48,7 +44,6 @@ export function verifyAdminToken(token?: string | null): { valid: boolean; email
       .update(payloadB64)
       .digest('base64url');
 
-    // Constant-time comparison to prevent timing attacks
     if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
       return { valid: false };
     }
@@ -66,16 +61,13 @@ export function verifyAdminToken(token?: string | null): { valid: boolean; email
   }
 }
 
-/**
- * Validates admin credentials against environment variables or admin_users database table
- */
+
 export async function authenticateAdmin(
   email: string,
   password: string
 ): Promise<{ success: boolean; user?: AdminUser; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
 
-  // 1. Check against environment credentials
   if (
     cleanEmail === DEFAULT_ADMIN_EMAIL.toLowerCase() &&
     password === DEFAULT_ADMIN_PASSWORD
@@ -90,7 +82,6 @@ export async function authenticateAdmin(
     };
   }
 
-  // 2. Check in Neon PostgreSQL admin_users table
   const sql = getNeonSql();
   if (sql) {
     try {
@@ -123,9 +114,7 @@ export async function authenticateAdmin(
   return { success: false, error: 'Invalid admin credentials.' };
 }
 
-/**
- * Checks if incoming request has a valid admin session cookie
- */
+
 export function checkAdminAuth(req: NextRequest): boolean {
   const cookie = req.cookies.get(ADMIN_COOKIE_NAME);
   if (!cookie?.value) return false;

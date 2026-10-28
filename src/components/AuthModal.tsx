@@ -94,7 +94,6 @@ export default function AuthModal({
         position: 'relative',
         animation: 'fadeIn 0.2s ease-out'
       }}>
-        {/* Close Button */}
         <button
           onClick={onClose}
           type="button"
@@ -113,7 +112,6 @@ export default function AuthModal({
           <X size={20} />
         </button>
 
-        {/* Modal Header */}
         <div style={{ padding: '26px 28px 18px 28px', borderBottom: '1px solid #e2e8f0' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
             STUDENT PORTAL
@@ -126,7 +124,6 @@ export default function AuthModal({
           </p>
         </div>
 
-        {/* Form Body */}
         <div style={{ padding: '24px 28px 28px 28px' }}>
           {error && (
             <div style={{
@@ -203,7 +200,6 @@ export default function AuthModal({
             </button>
           </form>
 
-          {/* Help box for credentials via WhatsApp */}
           <div style={{
             marginTop: '20px',
             paddingTop: '16px',

@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
     const course = getCourseById(courseId);
     const pricing = getPricing();
     
-    // Check consultation payment status for this email
     const hasConsultationCredit = await hasUserPaidConsultation(cleanEmail);
 
     if (courseId === 'call-consultation' && hasConsultationCredit) {
@@ -39,7 +38,6 @@ export async function POST(req: NextRequest) {
       basePrice = pricing.consultationPrice;
     }
 
-    // Call consultation is without tax; courses have 18% tax
     const isCallConsultation = courseId === 'call-consultation';
     const taxAmount = isCallConsultation ? 0 : Math.round(basePrice * 0.18);
     const totalAmount = basePrice + taxAmount;
@@ -48,7 +46,6 @@ export async function POST(req: NextRequest) {
     const txnid = generateTxnId();
     const courseName = course ? course.title : 'Music Production Course Fee';
 
-    // Save initial transaction record to database & memory cache
     await savePayment({
       txnid,
       amount: totalAmount,
@@ -68,7 +65,6 @@ export async function POST(req: NextRequest) {
     const surl = `${origin}/api/payu/callback`;
     const furl = `${origin}/api/payu/callback`;
 
-    // Calculate PayU SHA-512 Hash with total amount (base + 18% tax)
     const hash = generatePayUHash({
       key: config.merchantKey,
       txnid,
@@ -84,7 +80,6 @@ export async function POST(req: NextRequest) {
       salt: config.merchantSalt
     });
 
-    // Route directly to official PayU production gateway
     const actionUrl = config.paymentUrl;
 
     const formData: PayUFormData = {

@@ -10,13 +10,11 @@ import { getDatabaseUrl } from '@/lib/neon';
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Verify admin session
     const isAuthed = checkAdminAuth(req);
     if (!isAuthed) {
       return NextResponse.json({ error: 'Unauthorized: Admin authentication required' }, { status: 401 });
     }
 
-    // 2. Query data in parallel
     const [stats, payments, registrations, users] = await Promise.all([
       getAdminDashboardStats(),
       getAllPaymentsForAdmin(),

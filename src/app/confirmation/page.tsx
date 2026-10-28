@@ -41,7 +41,6 @@ function ConfirmationContent() {
               data.payment.courseName?.toLowerCase().includes('consultation') ||
               data.payment.courseName?.toLowerCase().includes('discovery');
 
-            // If Discovery Call / Consultation, mark as paid in server & local storage
             if (isConsultation && data.payment.email) {
               fetch('/api/auth/consultation-status', {
                 method: 'POST',
@@ -68,7 +67,6 @@ function ConfirmationContent() {
                   window.dispatchEvent(new Event('auth-change'));
                 }
               } catch (e) {
-                // ignore
               }
             }
           }
@@ -115,7 +113,6 @@ function ConfirmationContent() {
 
   return (
     <div className="container" style={{ padding: '32px 24px 60px 24px', maxWidth: '760px' }}>
-      {/* Step Progress Nav */}
       <div className="steps-nav no-print">
         <div className="step-item completed"><div className="step-number">✓</div><span className="btn-text-full">Select Program</span><span className="btn-text-mobile">Program</span></div>
         <div className="step-item completed"><div className="step-number">✓</div><span className="btn-text-full">Payment</span><span className="btn-text-mobile">Payment</span></div>
@@ -123,7 +120,6 @@ function ConfirmationContent() {
         <div className="step-item active completed"><div className="step-number">✓</div><span className="btn-text-full">Confirmed</span><span className="btn-text-mobile">Done</span></div>
       </div>
 
-      {/* Main Confirmation Banner */}
       <div className="no-print" style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div style={{
           width: '56px',
@@ -151,7 +147,6 @@ function ConfirmationContent() {
           Thank you <strong style={{ color: '#0f172a' }}>{registration?.fullName || payment?.studentName || 'Student'}</strong>. Your payment has been received successfully.
         </p>
 
-        {/* Action Buttons */}
         <div className="confirmation-actions" style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '20px', flexWrap: 'wrap' }}>
           <button
             onClick={handlePrint}
@@ -212,7 +207,6 @@ function ConfirmationContent() {
         </div>
       </div>
 
-      {/* Calendly Scheduling Box for Discovery Call */}
       {isConsultation && (
         <div className="no-print clean-card" style={{
           padding: '24px',
@@ -255,7 +249,6 @@ function ConfirmationContent() {
             </a>
           </div>
 
-          {/* Discovery Call Credit Notice */}
           <div style={{
             backgroundColor: '#ffffff',
             border: '1px solid #fde68a',
@@ -288,13 +281,11 @@ function ConfirmationContent() {
         </div>
       )}
 
-      {/* Official Receipt Card (Printable) */}
       <div className="receipt-card clean-card" style={{
         padding: '32px',
         backgroundColor: '#ffffff',
         border: '1px solid #cbd5e1'
       }}>
-        {/* Receipt Header */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -351,7 +342,6 @@ function ConfirmationContent() {
           </div>
         </div>
 
-        {/* Details Grid */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -430,7 +420,6 @@ function ConfirmationContent() {
           )}
         </div>
 
-        {/* Fee Breakdown */}
         <div style={{
           borderTop: '1px solid #e2e8f0',
           paddingTop: '14px',
@@ -451,7 +440,6 @@ function ConfirmationContent() {
           </div>
         </div>
 
-        {/* Footer Seal */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',

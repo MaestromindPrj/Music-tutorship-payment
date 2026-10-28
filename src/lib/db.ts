@@ -12,15 +12,10 @@ import {
   AdminStats
 } from './neon';
 
-// In-memory cache store for high-speed sub-millisecond response
 const memoryStore = {
   payments: new Map<string, PaymentRecord>(),
   registrations: new Map<string, StudentRegistration>()
 };
-
-// =========================================================================
-// Payment Operations (Neon PostgreSQL Primary Database + In-Memory Cache)
-// =========================================================================
 
 export async function savePayment(record: Omit<PaymentRecord, 'id'>): Promise<PaymentRecord> {
   const cleanTxnid = record.txnid.trim();
@@ -30,10 +25,8 @@ export async function savePayment(record: Omit<PaymentRecord, 'id'>): Promise<Pa
     id: `pay_${Date.now()}`
   };
 
-  // 1. Save in fast cache
   memoryStore.payments.set(cleanTxnid, savedRecord);
 
-  // 2. Persist to Neon PostgreSQL (Primary Database)
   await neonSavePayment(savedRecord).catch((e) =>
     console.warn('Neon PostgreSQL savePayment note:', e)
   );
@@ -60,7 +53,6 @@ export async function updatePaymentStatus(
 ): Promise<PaymentRecord | null> {
   const cleanTxnid = txnid.trim();
 
-  // 1. Update in-memory cache
   const existing = memoryStore.payments.get(cleanTxnid);
   let updatedRecord: PaymentRecord;
 
@@ -101,7 +93,6 @@ export async function updatePaymentStatus(
     memoryStore.payments.set(cleanTxnid, updatedRecord);
   }
 
-  // 2. Persist update to Neon PostgreSQL
   const neonUpdated = await neonUpdatePaymentStatus(cleanTxnid, status, details).catch((e) => {
     console.warn('Neon PostgreSQL updatePaymentStatus note:', e);
     return null;
@@ -119,11 +110,9 @@ export async function getPaymentByTxnId(txnid: string): Promise<PaymentRecord | 
   const cleanTxnid = txnid ? txnid.trim() : '';
   if (!cleanTxnid) return null;
 
-  // 1. Check in-memory cache
   const cached = memoryStore.payments.get(cleanTxnid);
   if (cached) return cached;
 
-  // 2. Query Neon PostgreSQL (Primary Database)
   const neonPayment = await neonGetPaymentByTxnId(cleanTxnid).catch((e) => {
     console.warn('Neon PostgreSQL getPaymentByTxnId note:', e);
     return null;
@@ -136,10 +125,6 @@ export async function getPaymentByTxnId(txnid: string): Promise<PaymentRecord | 
   return null;
 }
 
-// =========================================================================
-// Student Registration KYC Operations (Strictly 9 Fields)
-// =========================================================================
-
 export async function saveStudentRegistration(
   reg: Omit<StudentRegistration, 'id'>
 ): Promise<StudentRegistration> {
@@ -150,10 +135,8 @@ export async function saveStudentRegistration(
     id: `reg_${Date.now()}`
   };
 
-  // 1. Save in fast cache
   memoryStore.registrations.set(cleanTxnid, savedReg);
 
-  // 2. Persist to Neon PostgreSQL
   await neonSaveRegistration(savedReg).catch((e) =>
     console.warn('Neon PostgreSQL saveStudentRegistration note:', e)
   );
@@ -165,11 +148,9 @@ export async function getRegistrationByTxnId(txnid: string): Promise<StudentRegi
   const cleanTxnid = txnid ? txnid.trim() : '';
   if (!cleanTxnid) return null;
 
-  // 1. Check in-memory cache
   const cached = memoryStore.registrations.get(cleanTxnid);
   if (cached) return cached;
 
-  // 2. Query Neon PostgreSQL
   const neonReg = await neonGetRegistrationByTxnId(cleanTxnid).catch((e) => {
     console.warn('Neon PostgreSQL getRegistrationByTxnId note:', e);
     return null;
@@ -182,10 +163,6 @@ export async function getRegistrationByTxnId(txnid: string): Promise<StudentRegi
   return null;
 }
 
-// =========================================================================
-// Admin Dashboard Data Queries
-// =========================================================================
-
 export async function getAllPaymentsForAdmin(): Promise<PaymentWithRegistration[]> {
   const neonPayments = await neonGetAllPayments().catch((e) => {
     console.warn('Neon getAllPayments error:', e);
@@ -196,7 +173,6 @@ export async function getAllPaymentsForAdmin(): Promise<PaymentWithRegistration[
     return neonPayments;
   }
 
-  // Fallback to cache if Neon is not yet connected
   const payments: PaymentWithRegistration[] = [];
   memoryStore.payments.forEach((payment) => {
     const registration = memoryStore.registrations.get(payment.txnid) || null;

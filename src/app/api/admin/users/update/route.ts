@@ -4,7 +4,6 @@ import { adminUpdateUser } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Verify admin session
     const isAuthed = checkAdminAuth(req);
     if (!isAuthed) {
       return NextResponse.json(

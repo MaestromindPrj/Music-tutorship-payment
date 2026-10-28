@@ -81,7 +81,6 @@ export async function POST(req: NextRequest) {
       await markConsultationPaid(email);
     }
 
-    // Update database & cache with verified transaction status
     await updatePaymentStatus(
       txnid,
       isSuccess ? 'SUCCESS' : 'FAILED',
@@ -106,10 +105,8 @@ export async function POST(req: NextRequest) {
       if (isConsultationTxn) {
         return NextResponse.redirect(new URL(`/confirmation?txnid=${encodeURIComponent(txnid)}`, origin), 303);
       }
-      // Redirect to the mandatory registration form after payment
       return NextResponse.redirect(new URL(`/register?txnid=${encodeURIComponent(txnid)}`, origin), 303);
     } else {
-      // Redirect to failure view on homepage
       return NextResponse.redirect(
         new URL(`/?status=failed&txnid=${encodeURIComponent(txnid)}&error=${encodeURIComponent(error_Message || 'Transaction failed')}`, origin),
         303
@@ -123,7 +120,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // Support GET fallback if user returns via GET redirect
   const searchParams = req.nextUrl.searchParams;
   const txnid = searchParams.get('txnid');
   const status = searchParams.get('status');

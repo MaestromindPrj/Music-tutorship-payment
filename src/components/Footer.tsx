@@ -14,14 +14,12 @@ export default function Footer() {
       fontFamily: 'var(--font-family)'
     }} id="footer-contact">
       <div className="container" style={{ maxWidth: '1240px' }}>
-        {/* Top Grid Section */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '40px',
           marginBottom: '40px'
         }}>
-          {/* Column 1: Brand & Receipt CTA */}
           <div>
             <h3 style={{
               fontSize: '18px',
@@ -66,7 +64,6 @@ export default function Footer() {
             </Link>
           </div>
 
-          {/* Column 2: Contact Info */}
           <div>
             <h4 style={{
               fontSize: '11px',
@@ -105,7 +102,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar Divider */}
         <div style={{
           borderTop: '1px solid #1f2937',
           paddingTop: '24px',

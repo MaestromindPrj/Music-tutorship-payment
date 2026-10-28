@@ -19,7 +19,6 @@ export interface PaymentWithRegistration extends PaymentRecord {
   registration?: StudentRegistration | null;
 }
 
-// Ensure DNS resilience for both local development and cloud production
 let dnsConfigured = false;
 function setupDnsResilience() {
   if (dnsConfigured || typeof window !== 'undefined') return;
@@ -32,7 +31,6 @@ function setupDnsResilience() {
     neonConfig.fetchFunction = async (urlStr: string | URL, init: any = {}) => {
       const url = new URL(urlStr.toString());
 
-      // Attempt to resolve IP using public DNS resolvers if local router lookup struggles
       const ip = await new Promise<string>((resolve) => {
         resolver.resolve4(url.hostname, (err, addresses) => {
           if (err || !addresses || addresses.length === 0) {
@@ -57,7 +55,7 @@ function setupDnsResilience() {
             path: url.pathname + url.search,
             method: init.method || 'GET',
             headers,
-            servername: url.hostname // SNI for SSL handshake
+            servername: url.hostname
           },
           (res) => {
             const chunks: Buffer[] = [];
@@ -114,9 +112,7 @@ export function getNeonSql() {
 
 let dbInitialized = false;
 
-/**
- * Ensures required PostgreSQL tables and indexes exist in Neon
- */
+
 export async function initDb(): Promise<{ success: boolean; message: string }> {
   const sql = getNeonSql();
   if (!sql) {
@@ -124,7 +120,6 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
   }
 
   try {
-    // 1. Users table (Stores logged in / registered students)
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(100) PRIMARY KEY,
@@ -138,7 +133,6 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
       );
     `;
 
-    // 2. Payments table (Stores transactions for courses and 1-on-1 call consultations)
     await sql`
       CREATE TABLE IF NOT EXISTS payments (
         id VARCHAR(100) PRIMARY KEY,
@@ -160,7 +154,6 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
       );
     `;
 
-    // 3. Registrations table (Stores 9 KYC details submitted by users after payment)
     await sql`
       CREATE TABLE IF NOT EXISTS registrations (
         id VARCHAR(100) PRIMARY KEY,
@@ -178,7 +171,6 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
       );
     `;
 
-    // 4. Admin users table
     await sql`
       CREATE TABLE IF NOT EXISTS admin_users (
         id VARCHAR(100) PRIMARY KEY,
@@ -189,7 +181,6 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
       );
     `;
 
-    // 5. Password Reset OTPs table
     await sql`
       CREATE TABLE IF NOT EXISTS password_reset_otps (
         id VARCHAR(100) PRIMARY KEY,
@@ -204,11 +195,9 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
       );
     `;
 
-    // Ensure columns for Google Auth exist
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
 
-    // Indexes for fast lookups
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_email ON payments(email);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at DESC);`;
@@ -232,9 +221,6 @@ export async function ensureDbInitialized(): Promise<void> {
   await initDb().catch((err) => console.warn('Could not auto-initialize tables:', err));
 }
 
-// =========================================================================
-// User Operations (Neon PostgreSQL)
-// =========================================================================
 
 export async function neonFindUserByEmail(email: string): Promise<UserAccount | null> {
   const sql = getNeonSql();
@@ -394,9 +380,6 @@ export async function neonGetAllUsers(): Promise<Array<{
   }));
 }
 
-// =========================================================================
-// Password Reset OTP Operations (Neon PostgreSQL)
-// =========================================================================
 
 export async function neonSaveOtp(email: string, otpCode: string, expiresAt: Date): Promise<boolean> {
   const sql = getNeonSql();
@@ -406,7 +389,6 @@ export async function neonSaveOtp(email: string, otpCode: string, expiresAt: Dat
   const cleanEmail = email.trim().toLowerCase();
   const id = `otp_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
 
-  // Invalidate any existing unused OTPs for this email first
   await sql`
     UPDATE password_reset_otps
     SET is_used = TRUE
@@ -432,7 +414,6 @@ export async function neonVerifyOtp(
   const cleanEmail = email.trim().toLowerCase();
   const cleanOtp = otpCode.trim();
 
-  // Find latest active OTP for this email
   const rows = await sql`
     SELECT id, email, otp_code, attempts, is_verified, is_used, expires_at
     FROM password_reset_otps
@@ -447,13 +428,11 @@ export async function neonVerifyOtp(
 
   const record = rows[0];
 
-  // Check if expired
   if (new Date(record.expires_at).getTime() < Date.now()) {
     await sql`UPDATE password_reset_otps SET is_used = TRUE WHERE id = ${record.id}`;
     return { success: false, error: 'This verification code has expired. Please request a new one.' };
   }
 
-  // Check attempts limit (max 5)
   if (record.attempts >= 5) {
     await sql`UPDATE password_reset_otps SET is_used = TRUE WHERE id = ${record.id}`;
     return { success: false, error: 'Too many incorrect attempts. Please request a new code.' };
@@ -472,7 +451,6 @@ export async function neonVerifyOtp(
     };
   }
 
-  // OTP verified! Generate single-use reset token
   const resetToken = `rst_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`;
   await sql`
     UPDATE password_reset_otps
@@ -508,20 +486,17 @@ export async function neonResetPasswordWithToken(
 
   const record = rows[0];
 
-  // Check token lifetime (15 mins from verification)
   if (new Date(record.expires_at).getTime() + 15 * 60 * 1000 < Date.now()) {
     await sql`UPDATE password_reset_otps SET is_used = TRUE WHERE id = ${record.id}`;
     return { success: false, error: 'Reset session expired. Please request a new code.' };
   }
 
-  // Update password in users table
   await sql`
     UPDATE users
     SET password = ${newHashedPassword}, updated_at = NOW()
     WHERE email = ${cleanEmail};
   `;
 
-  // Invalidate OTP record
   await sql`
     UPDATE password_reset_otps
     SET is_used = TRUE
@@ -582,9 +557,6 @@ export async function neonUpsertGoogleUser(params: {
   };
 }
 
-// =========================================================================
-// Payment Operations (Neon PostgreSQL)
-// =========================================================================
 
 export async function neonSavePayment(record: PaymentRecord): Promise<boolean> {
   const sql = getNeonSql();
@@ -681,7 +653,6 @@ export async function neonUpdatePaymentStatus(
   `;
 
   if (!rows || rows.length === 0) {
-    // If not existing, insert as fallback
     const id = `pay_${Date.now()}`;
     const insertRows = await sql`
       INSERT INTO payments (
@@ -815,9 +786,6 @@ export async function neonGetAllPayments(): Promise<PaymentWithRegistration[]> {
   });
 }
 
-// =========================================================================
-// Student Registration (KYC Details post-payment)
-// =========================================================================
 
 export async function neonSaveRegistration(reg: StudentRegistration): Promise<boolean> {
   const sql = getNeonSql();
@@ -920,9 +888,6 @@ export async function neonGetAllRegistrations(): Promise<StudentRegistration[]> 
   }));
 }
 
-// =========================================================================
-// Admin Dashboard Aggregates
-// =========================================================================
 
 export async function neonGetAdminStats(): Promise<AdminStats> {
   const sql = getNeonSql();

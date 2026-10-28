@@ -22,7 +22,6 @@ function RegisterFormContent() {
   const [errorMessage, setErrorMessage] = useState('');
   const [payment, setPayment] = useState<PaymentRecord | null>(null);
 
-  // Form State containing ONLY the 9 fields requested
   const [formData, setFormData] = useState({
     fullName: '',
     dob: '',
@@ -193,7 +192,6 @@ function RegisterFormContent() {
 
   return (
     <div className="container" style={{ padding: '32px 24px 60px 24px', maxWidth: '720px' }}>
-      {/* Verified Banner */}
       <div style={{
         backgroundColor: 'rgba(21, 128, 61, 0.08)',
         border: 'none',
@@ -226,7 +224,6 @@ function RegisterFormContent() {
         </div>
       </div>
 
-      {/* Form Container */}
       <div className="clean-card" style={{ padding: '32px' }}>
         <div style={{ marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
           <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
@@ -256,7 +253,6 @@ function RegisterFormContent() {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* 1. Name */}
           <div className="form-group">
             <label className="form-label" htmlFor="fullName">
               <span>Name *</span>
@@ -276,7 +272,6 @@ function RegisterFormContent() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-            {/* 2. DOB */}
             <div className="form-group">
               <label className="form-label" htmlFor="dob">
                 <span>DOB (Date of Birth) *</span>
@@ -294,7 +289,6 @@ function RegisterFormContent() {
               {errors.dob && <div className="form-error-msg"><AlertCircle size={13} />{errors.dob}</div>}
             </div>
 
-            {/* 5. GENDER */}
             <div className="form-group">
               <label className="form-label" htmlFor="gender">
                 <span>GENDER *</span>
@@ -312,7 +306,6 @@ function RegisterFormContent() {
             </div>
           </div>
 
-          {/* 3. ADDRESS */}
           <div className="form-group">
             <label className="form-label" htmlFor="address">
               <span>ADDRESS *</span>
@@ -332,7 +325,6 @@ function RegisterFormContent() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-            {/* 4. AADHAR CARD */}
             <div className="form-group">
               <label className="form-label" htmlFor="aadharCard">
                 <span>AADHAR CARD *</span>
@@ -349,7 +341,6 @@ function RegisterFormContent() {
               {errors.aadharCard && <div className="form-error-msg"><AlertCircle size={13} />{errors.aadharCard}</div>}
             </div>
 
-            {/* 8. PAN */}
             <div className="form-group">
               <label className="form-label" htmlFor="pan">
                 <span>PAN *</span>
@@ -369,7 +360,6 @@ function RegisterFormContent() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-            {/* 6. MAIL ID */}
             <div className="form-group">
               <label className="form-label" htmlFor="email">
                 <span>MAIL ID *</span>
@@ -388,7 +378,6 @@ function RegisterFormContent() {
               {errors.email && <div className="form-error-msg"><AlertCircle size={13} />{errors.email}</div>}
             </div>
 
-            {/* 7. PHONE NUMBER */}
             <div className="form-group">
               <label className="form-label" htmlFor="phone">
                 <span>PHONE NUMBER *</span>
@@ -408,7 +397,6 @@ function RegisterFormContent() {
             </div>
           </div>
 
-          {/* 9. OCCUPATION */}
           <div className="form-group" style={{ marginBottom: '28px' }}>
             <label className="form-label" htmlFor="occupation">
               <span>OCCUPATION *</span>
@@ -427,7 +415,6 @@ function RegisterFormContent() {
             {errors.occupation && <div className="form-error-msg"><AlertCircle size={13} />{errors.occupation}</div>}
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={isSubmitting}

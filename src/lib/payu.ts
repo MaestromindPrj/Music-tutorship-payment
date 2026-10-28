@@ -1,11 +1,6 @@
 import crypto from 'crypto';
 
-/**
- * =========================================================================
- * PayU Payment Gateway Integration for Music Tutorship
- * Subdomain: payments.musictutorship.in
- * =========================================================================
- */
+
 
 export interface PayUConfig {
   merchantKey: string;
@@ -16,12 +11,10 @@ export interface PayUConfig {
 }
 
 export function getPayUConfig(): PayUConfig {
-  // Production PayU Credentials
   const merchantKey = process.env.PAYU_MERCHANT_KEY || 'kBVBg7';
   const merchantSalt = process.env.PAYU_MERCHANT_SALT || '9ymk3c7nXHs94Brh3VQ4wGUaPctkvYgq';
   const merchantMid = process.env.PAYU_MERCHANT_MID || process.env.PAYU_MERCHANT_ID || '13041074';
 
-  // PayU Production Endpoint
   const paymentUrl = process.env.PAYU_PAYMENT_URL || 'https://secure.payu.in/_payment';
   const isLiveMode = true;
 
@@ -34,10 +27,7 @@ export function getPayUConfig(): PayUConfig {
   };
 }
 
-/**
- * PayU SHA-512 Outbound Request Hash Formula:
- * sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT)
- */
+
 export function generatePayUHash(params: {
   key: string;
   txnid: string;
@@ -71,12 +61,7 @@ export function generatePayUHash(params: {
   return crypto.createHash('sha512').update(hashString).digest('hex');
 }
 
-/**
- * PayU SHA-512 Inbound Response Verification Hash Formula:
- * sha512(SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
- * Or with additionalCharges:
- * sha512(additionalCharges|SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
- */
+
 export function verifyPayUResponseHash(params: {
   status: string;
   txnid: string;
@@ -133,9 +118,7 @@ export function verifyPayUResponseHash(params: {
   }
 }
 
-/**
- * Generates a unique Transaction ID for Music Tutorship
- */
+
 export function generateTxnId(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = crypto.randomBytes(4).toString('hex').toUpperCase();
