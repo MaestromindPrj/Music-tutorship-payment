@@ -664,9 +664,9 @@ export default function AdminPage() {
   // Screen 2: Authenticated Admin Dashboard with Sidebar Layout
   // =========================================================================
   return (
-    <div className="container" style={{ padding: '32px 32px 80px 32px', maxWidth: '1600px', width: '100%' }}>
+    <div className="container admin-container" style={{ padding: '32px 32px 80px 32px', maxWidth: '1600px', width: '100%' }}>
       {/* Admin Top Action Header */}
-      <div style={{
+      <div className="admin-top-header" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -677,7 +677,7 @@ export default function AdminPage() {
         borderBottom: '1px solid #e2e8f0'
       }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
+          <h1 className="admin-title" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
             Payments & Enrollment Dashboard
           </h1>
           <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
@@ -686,7 +686,7 @@ export default function AdminPage() {
         </div>
 
         {/* Top Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="admin-top-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Refresh Button */}
           <button
             onClick={fetchDashboardData}
@@ -743,7 +743,7 @@ export default function AdminPage() {
       </div>
 
       {/* Main Dashboard Layout with Sidebar */}
-      <div style={{
+      <div className="admin-layout" style={{
         display: 'flex',
         gap: '24px',
         alignItems: 'flex-start',
@@ -752,7 +752,7 @@ export default function AdminPage() {
         {/* =============================================================== */}
         {/* SIDEBAR NAVIGATION */}
         {/* =============================================================== */}
-        <aside style={{ width: '270px', flexShrink: 0, minWidth: '240px' }}>
+        <aside className="admin-sidebar" style={{ width: '270px', flexShrink: 0, minWidth: '240px' }}>
           <div className="clean-card" style={{ padding: '16px', marginBottom: '16px' }}>
             <div style={{
               fontSize: '11px',
@@ -767,10 +767,11 @@ export default function AdminPage() {
               MANAGEMENT TABS
             </div>
 
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <nav className="admin-sidebar-nav" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {/* Sidetab 1: Payments & Enrollments */}
               <button
                 onClick={() => setActiveTab('payments')}
+                className={`admin-tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -790,7 +791,7 @@ export default function AdminPage() {
                   <CreditCard size={16} />
                   <span>Payments & Enrollments</span>
                 </div>
-                <span style={{
+                <span className="tab-badge" style={{
                   fontSize: '11px',
                   fontWeight: 800,
                   padding: '2px 8px',
@@ -804,6 +805,7 @@ export default function AdminPage() {
               {/* Sidetab 2: Student KYC Details */}
               <button
                 onClick={() => setActiveTab('registrations')}
+                className={`admin-tab-btn ${activeTab === 'registrations' ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -823,7 +825,7 @@ export default function AdminPage() {
                   <FileText size={16} />
                   <span>Student KYC Details</span>
                 </div>
-                <span style={{
+                <span className="tab-badge" style={{
                   fontSize: '11px',
                   fontWeight: 800,
                   padding: '2px 8px',
@@ -837,6 +839,7 @@ export default function AdminPage() {
               {/* Sidetab 3: Logged In Users */}
               <button
                 onClick={() => setActiveTab('users')}
+                className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -856,7 +859,7 @@ export default function AdminPage() {
                   <Users size={16} />
                   <span>Logged In Users</span>
                 </div>
-                <span style={{
+                <span className="tab-badge" style={{
                   fontSize: '11px',
                   fontWeight: 800,
                   padding: '2px 8px',
@@ -869,7 +872,7 @@ export default function AdminPage() {
             </nav>
 
             {/* Sidebar Quick Action: Add User */}
-            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+            <div className="admin-sidebar-action" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
               <button
                 onClick={() => {
                   setIsAddUserOpen(true);
@@ -901,69 +904,69 @@ export default function AdminPage() {
         {/* =============================================================== */}
         {/* MAIN DATA VIEW AREA */}
         {/* =============================================================== */}
-        <main style={{ flex: 1, minWidth: 0, width: '100%' }}>
+        <main className="admin-main" style={{ flex: 1, minWidth: 0, width: '100%' }}>
           {/* Metric Overview Cards */}
-          <div style={{
+          <div className="admin-metrics-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             gap: '16px',
             marginBottom: '24px'
           }}>
             {/* Total Revenue */}
-            <div className="clean-card" style={{ padding: '20px 24px' }}>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
+              <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Total Revenue
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
+              <div className="metric-val" style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
                 ₹{stats.totalRevenue.toLocaleString('en-IN')}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              <div className="metric-sub" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                 From {stats.successPayments} enrollments
               </div>
             </div>
 
             {/* Successful Enrollments */}
-            <div className="clean-card" style={{ padding: '20px 24px' }}>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
+              <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Successful Payments
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
+              <div className="metric-val" style={{ fontSize: '26px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
                 {stats.successPayments}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              <div className="metric-sub" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                 {stats.pendingPayments} pending • {stats.failedPayments} failed
               </div>
             </div>
 
             {/* Submitted KYC Profiles */}
-            <div className="clean-card" style={{ padding: '20px 24px' }}>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
+              <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 KYC Registrations
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
+              <div className="metric-val" style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
                 {stats.totalRegistrations}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              <div className="metric-sub" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                 Post-payment profiles
               </div>
             </div>
 
             {/* Registered Users */}
-            <div className="clean-card" style={{ padding: '20px 24px' }}>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div className="clean-card admin-metric-card" style={{ padding: '20px 24px' }}>
+              <div className="metric-title" style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Student Accounts
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
+              <div className="metric-val" style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
                 {stats.totalUsers}
               </div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+              <div className="metric-sub" style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                 Accounts in database
               </div>
             </div>
           </div>
 
           {/* Filter and Search Bar */}
-          <div style={{
+          <div className="admin-toolbar" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
@@ -972,7 +975,7 @@ export default function AdminPage() {
             flexWrap: 'wrap'
           }}>
             {/* Search Input */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <div className="admin-search-wrapper" style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
               <input
                 type="text"
@@ -999,7 +1002,7 @@ export default function AdminPage() {
 
             {/* Filters for Payments */}
             {activeTab === 'payments' && (
-              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="admin-filters-wrapper" style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
                 <select
                   className="form-select"
                   value={statusFilter}
@@ -1026,7 +1029,7 @@ export default function AdminPage() {
             )}
 
             {/* Right Action Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
+            <div className="admin-action-buttons" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
               {activeTab === 'users' && (
                 <button
                   onClick={() => {
@@ -1083,7 +1086,8 @@ export default function AdminPage() {
           {/* =============================================================== */}
           {activeTab === 'payments' && (
             <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="admin-table-mobile-hint">Swipe horizontally to view full table →</div>
+              <div className="admin-table-scroll" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1218,7 +1222,8 @@ export default function AdminPage() {
           {/* =============================================================== */}
           {activeTab === 'registrations' && (
             <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
+              <div className="admin-table-mobile-hint">Swipe horizontally to view full table →</div>
+              <div className="admin-table-scroll" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1310,7 +1315,8 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
+              <div className="admin-table-mobile-hint">Swipe horizontally to view full table →</div>
+              <div className="admin-table-scroll" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1418,7 +1424,7 @@ export default function AdminPage() {
       {/* MODAL 1: ADD NEW USER (Direct from Admin + WhatsApp Share) */}
       {/* =================================================================== */}
       {isAddUserOpen && (
-        <div style={{
+        <div className="admin-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1432,7 +1438,7 @@ export default function AdminPage() {
           padding: '20px',
           zIndex: 80
         }}>
-          <div className="clean-card" style={{
+          <div className="clean-card admin-modal-card" style={{
             width: '100%',
             maxWidth: '480px',
             padding: '32px',
@@ -1658,7 +1664,7 @@ export default function AdminPage() {
       {/* MODAL: EDIT STUDENT / CHANGE PASSWORD */}
       {/* =================================================================== */}
       {editingUser && (
-        <div style={{
+        <div className="admin-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1672,7 +1678,7 @@ export default function AdminPage() {
           padding: '20px',
           zIndex: 80
         }}>
-          <div className="clean-card" style={{
+          <div className="clean-card admin-modal-card" style={{
             width: '100%',
             maxWidth: '480px',
             padding: '32px',
@@ -1909,7 +1915,7 @@ export default function AdminPage() {
       {/* MODAL 2: STUDENT DETAILS INSPECTION MODAL */}
       {/* =================================================================== */}
       {selectedStudentDetails && (
-        <div style={{
+        <div className="admin-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1923,7 +1929,7 @@ export default function AdminPage() {
           padding: '20px',
           zIndex: 60
         }}>
-          <div className="clean-card" style={{
+          <div className="clean-card admin-modal-card" style={{
             width: '100%',
             maxWidth: '680px',
             maxHeight: '90vh',

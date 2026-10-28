@@ -340,26 +340,30 @@ function HomeContent() {
         <div className="steps-nav">
           <div className="step-item active">
             <div className="step-number">1</div>
-            <span>Select Program / Option</span>
+            <span className="btn-text-full">Select Program / Option</span>
+            <span className="btn-text-mobile">Program</span>
           </div>
           <div className="step-item">
             <div className="step-number">2</div>
-            <span>Payment</span>
+            <span className="btn-text-full">Payment</span>
+            <span className="btn-text-mobile">Payment</span>
           </div>
           <div className="step-item">
             <div className="step-number">3</div>
-            <span>Student KYC Details</span>
+            <span className="btn-text-full">Student KYC Details</span>
+            <span className="btn-text-mobile">KYC Details</span>
           </div>
           <div className="step-item">
             <div className="step-number">4</div>
-            <span>Confirmation Receipt</span>
+            <span className="btn-text-full">Confirmation Receipt</span>
+            <span className="btn-text-mobile">Receipt</span>
           </div>
         </div>
 
         <div className="grid-2">
           {/* Left Column: Course & Consultation Selection Cards */}
           <div>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
                 Select Your Program or Consultation
               </h2>
@@ -381,7 +385,7 @@ function HomeContent() {
                   <div
                     key={course.id}
                     onClick={() => !isDisabled && handleCourseSelect(course.id)}
-                    className="clean-card"
+                    className="clean-card course-selection-card"
                     style={{
                       padding: '24px',
                       cursor: isDisabled ? 'not-allowed' : 'pointer',
@@ -401,21 +405,29 @@ function HomeContent() {
                       userSelect: 'none'
                     }}
                   >
-                    {/* Badge */}
+                    {/* Top Tag & Badge Row */}
                     <div style={{
-                      position: 'absolute',
-                      top: '18px',
-                      right: '18px',
                       display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      gap: '4px'
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      marginBottom: '8px',
+                      flexWrap: 'wrap'
                     }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: isDisabled ? '#94a3b8' : '#b8871b',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {course.tag}
+                      </div>
+
                       {course.badge && (
                         <div style={{
                           fontSize: '10px',
                           fontWeight: 700,
-                          padding: '4px 8px',
+                          padding: '3px 8px',
                           borderRadius: '0px',
                           backgroundColor: isDisabled
                             ? 'rgba(100, 116, 139, 0.12)'
@@ -435,22 +447,11 @@ function HomeContent() {
                       )}
                     </div>
 
-                    <div style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: isDisabled ? '#94a3b8' : '#b8871b',
-                      letterSpacing: '0.5px',
-                      marginBottom: '4px'
-                    }}>
-                      {course.tag}
-                    </div>
-
-                    <h3 style={{
+                    <h3 className="course-card-title" style={{
                       fontSize: '17px',
                       fontWeight: 700,
                       color: isDisabled ? '#475569' : '#0f172a',
-                      marginBottom: '2px',
-                      paddingRight: '120px'
+                      marginBottom: '2px'
                     }}>
                       {course.title}
                     </h3>
@@ -603,7 +604,7 @@ function HomeContent() {
 
           {/* Right Column: Checkout Form & Summary */}
           <div>
-            <div className="clean-card" style={{ padding: '28px', position: 'sticky', top: '90px' }}>
+            <div className="clean-card checkout-sticky-card" style={{ padding: '28px', position: 'sticky', top: '90px' }}>
               <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '20px' }}>
                 <span className="section-overline">SECURE CHECKOUT</span>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>

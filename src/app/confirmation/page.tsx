@@ -113,10 +113,10 @@ function ConfirmationContent() {
     <div className="container" style={{ padding: '32px 24px 60px 24px', maxWidth: '760px' }}>
       {/* Step Progress Nav */}
       <div className="steps-nav no-print">
-        <div className="step-item completed"><div className="step-number">✓</div><span>Select Program</span></div>
-        <div className="step-item completed"><div className="step-number">✓</div><span>Payment</span></div>
-        <div className="step-item completed"><div className="step-number">✓</div><span>Student Details</span></div>
-        <div className="step-item active completed"><div className="step-number">✓</div><span>Confirmed</span></div>
+        <div className="step-item completed"><div className="step-number">✓</div><span className="btn-text-full">Select Program</span><span className="btn-text-mobile">Program</span></div>
+        <div className="step-item completed"><div className="step-number">✓</div><span className="btn-text-full">Payment</span><span className="btn-text-mobile">Payment</span></div>
+        <div className="step-item completed"><div className="step-number">✓</div><span className="btn-text-full">Student Details</span><span className="btn-text-mobile">Details</span></div>
+        <div className="step-item active completed"><div className="step-number">✓</div><span className="btn-text-full">Confirmed</span><span className="btn-text-mobile">Done</span></div>
       </div>
 
       {/* Main Confirmation Banner */}

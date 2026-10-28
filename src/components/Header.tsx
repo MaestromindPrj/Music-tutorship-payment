@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, LogOut, CheckCircle, ExternalLink } from 'lucide-react';
+import { User, LogOut, ExternalLink } from 'lucide-react';
 import AuthModal from './AuthModal';
 
 export default function Header() {
@@ -48,7 +48,7 @@ export default function Header() {
 
   return (
     <>
-      <header style={{
+      <header className="site-header" style={{
         position: 'sticky',
         top: 0,
         zIndex: 50,
@@ -56,39 +56,33 @@ export default function Header() {
         borderBottom: '1px solid #eaeaea',
         boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
       }}>
-        <div className="container" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          height: '84px',
-          maxWidth: isAdminRoute ? '1600px' : '1240px',
-          width: '100%',
-          padding: isAdminRoute ? '0 32px' : '0 24px'
-        }}>
+        <div className={`container header-container ${isAdminRoute ? 'header-admin-container' : ''}`}>
           {/* Brand Logo & Title */}
-          <Link href="/" style={{
+          <Link href="/" className="header-brand" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             textDecoration: 'none',
-            color: '#000000'
+            color: '#000000',
+            flexShrink: 0
           }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/logo.png"
               alt="Music Tutorship"
-              width={35}
-              height={35}
+              width={34}
+              height={34}
+              className="header-brand-logo"
               style={{
                 borderRadius: '50%',
                 objectFit: 'cover',
                 display: 'block'
               }}
             />
-            <span style={{
+            <span className="header-brand-title" style={{
               fontFamily: 'var(--font-family)',
               fontWeight: 600,
-              fontSize: '17px',
+              fontSize: '16px',
               letterSpacing: '-0.01em',
               color: '#111111'
             }}>
@@ -96,32 +90,33 @@ export default function Header() {
             </span>
           </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="header-actions">
             {isAdminRoute ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="header-admin-badge" style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  letterSpacing: '1px',
+                  letterSpacing: '0.8px',
                   textTransform: 'uppercase',
                   color: '#b8871b',
                   backgroundColor: 'rgba(226, 177, 60, 0.12)',
-                  padding: '4px 10px',
+                  padding: '4px 8px',
                   border: '1px solid rgba(226, 177, 60, 0.3)'
                 }}>
-                  ADMIN PORTAL
+                  ADMIN
                 </span>
                 <Link
                   href="/"
+                  className="header-admin-link"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '4px',
                     fontSize: '12px',
                     fontWeight: 600,
                     color: '#64748b',
                     textDecoration: 'none',
-                    padding: '8px 14px',
+                    padding: '6px 12px',
                     border: '1px solid #e2e8f0',
                     transition: 'all 0.2s'
                   }}
@@ -129,76 +124,34 @@ export default function Header() {
                   onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.color = '#64748b'; (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; }}
                 >
                   <ExternalLink size={13} />
-                  <span>VIEW USER SITE</span>
+                  <span className="btn-text-full">VIEW USER SITE</span>
+                  <span className="btn-text-mobile">SITE</span>
                 </Link>
               </div>
             ) : (
               <>
                 {currentUser ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      padding: '0 14px',
-                      height: '40px',
-                      boxSizing: 'border-box',
-                      fontSize: '12px',
-                      color: '#0f172a'
-                    }}>
-                      <User size={14} style={{ color: '#b8871b' }} />
-                      <span style={{ fontWeight: 600, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {currentUser.email}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="header-user-badge">
+                      <User size={14} style={{ color: '#b8871b', flexShrink: 0 }} />
+                      <span className="header-user-email">
+                        {currentUser.name ? currentUser.name.split(' ')[0] : currentUser.email}
                       </span>
                     </div>
-
 
                     <button
                       onClick={handleLogout}
                       title="Logout"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        backgroundColor: 'transparent',
-                        border: '1px solid #e2e8f0',
-                        color: '#64748b',
-                        padding: '0 14px',
-                        height: '40px',
-                        boxSizing: 'border-box',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#000000'; (e.currentTarget as HTMLElement).style.color = '#000000'; }}
-                      onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
+                      className="header-logout-btn"
                     >
                       <LogOut size={13} />
-                      <span>Logout</span>
+                      <span className="btn-text-full">Logout</span>
                     </button>
                   </div>
                 ) : (
                   <button
                     onClick={() => setIsAuthOpen(true)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      backgroundColor: 'transparent',
-                      color: '#111111',
-                      border: '1px solid #111111',
-                      padding: '0 18px',
-                      height: '40px',
-                      boxSizing: 'border-box',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      letterSpacing: '0.5px',
-                      textTransform: 'uppercase',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="header-login-btn"
                     onMouseOver={(e) => {
                       (e.currentTarget as HTMLElement).style.backgroundColor = '#111111';
                       (e.currentTarget as HTMLElement).style.color = '#ffffff';
@@ -208,7 +161,7 @@ export default function Header() {
                       (e.currentTarget as HTMLElement).style.color = '#111111';
                     }}
                   >
-                    <User size={14} />
+                    <User size={13} />
                     <span>Login</span>
                   </button>
                 )}
@@ -216,29 +169,11 @@ export default function Header() {
                 <Link
                   href="/lookup"
                   className="header-cta-btn"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#111111',
-                    color: '#ffffff',
-                    padding: '0 22px',
-                    height: '40px',
-                    boxSizing: 'border-box',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    letterSpacing: '0.8px',
-                    textTransform: 'uppercase',
-                    textDecoration: 'none',
-                    borderRadius: '0px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s ease'
-                  }}
                   onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#262626'; }}
                   onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#111111'; }}
                 >
-                  RECEIPT LOOKUP
+                  <span className="btn-text-full">RECEIPT LOOKUP</span>
+                  <span className="btn-text-mobile">LOOKUP</span>
                 </Link>
               </>
             )}
@@ -251,6 +186,8 @@ export default function Header() {
         onClose={() => setIsAuthOpen(false)}
         onSuccess={(user) => {
           setCurrentUser(user);
+          setIsAuthOpen(false);
+          window.dispatchEvent(new Event('auth-change'));
         }}
       />
     </>
