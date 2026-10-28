@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -33,7 +35,12 @@ export default function Header() {
     };
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore
+    }
     localStorage.removeItem('mt_user');
     setCurrentUser(null);
     window.dispatchEvent(new Event('auth-change'));
@@ -54,7 +61,9 @@ export default function Header() {
           alignItems: 'center',
           justifyContent: 'space-between',
           height: '84px',
-          maxWidth: '1240px'
+          maxWidth: isAdminRoute ? '1600px' : '1240px',
+          width: '100%',
+          padding: isAdminRoute ? '0 32px' : '0 24px'
         }}>
           {/* Brand Logo & Title */}
           <Link href="/" style={{
@@ -133,7 +142,9 @@ export default function Header() {
                       gap: '6px',
                       backgroundColor: '#f8fafc',
                       border: '1px solid #e2e8f0',
-                      padding: '8px 12px',
+                      padding: '0 14px',
+                      height: '40px',
+                      boxSizing: 'border-box',
                       fontSize: '12px',
                       color: '#0f172a'
                     }}>
@@ -141,18 +152,8 @@ export default function Header() {
                       <span style={{ fontWeight: 600, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {currentUser.email}
                       </span>
-                      {currentUser.hasPaidConsultation && (
-                        <span style={{
-                          backgroundColor: 'rgba(21, 128, 61, 0.1)',
-                          color: '#15803d',
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          padding: '2px 6px'
-                        }}>
-                          ₹10K CREDIT
-                        </span>
-                      )}
                     </div>
+
 
                     <button
                       onClick={handleLogout}
@@ -164,7 +165,9 @@ export default function Header() {
                         backgroundColor: 'transparent',
                         border: '1px solid #e2e8f0',
                         color: '#64748b',
-                        padding: '8px 12px',
+                        padding: '0 14px',
+                        height: '40px',
+                        boxSizing: 'border-box',
                         fontSize: '12px',
                         cursor: 'pointer',
                         transition: 'all 0.2s'
@@ -186,7 +189,9 @@ export default function Header() {
                       backgroundColor: 'transparent',
                       color: '#111111',
                       border: '1px solid #111111',
-                      padding: '10px 18px',
+                      padding: '0 18px',
+                      height: '40px',
+                      boxSizing: 'border-box',
                       fontSize: '12px',
                       fontWeight: 600,
                       letterSpacing: '0.5px',
@@ -217,7 +222,9 @@ export default function Header() {
                     justifyContent: 'center',
                     backgroundColor: '#111111',
                     color: '#ffffff',
-                    padding: '12px 24px',
+                    padding: '0 22px',
+                    height: '40px',
+                    boxSizing: 'border-box',
                     fontSize: '12px',
                     fontWeight: 500,
                     letterSpacing: '0.8px',

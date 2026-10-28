@@ -1,6 +1,8 @@
+import crypto from 'crypto';
 import {
   neonFindUserByEmail,
   neonSaveUser,
+  neonUpdateUser,
   neonUpdateUserPassword,
   neonMarkConsultationPaid,
   neonGetAllUsers,
@@ -15,13 +17,97 @@ export interface UserAccount {
   hasPaidConsultation: boolean;
   createdAt: string;
   lastLoginAt?: string;
+  googleId?: string;
+  avatarUrl?: string;
 }
 
-// In-memory persistent user registry
+// In-memory cache for ultra-fast session validation
 const userStore = new Map<string, UserAccount>();
 
 // Track emails that have paid consultation
 const consultationPaidEmails = new Set<string>();
+
+// User Session Token Secret
+const USER_SESSION_SECRET = process.env.USER_SESSION_SECRET || process.env.ADMIN_SECRET || 'music-tutorship-user-secret-2025';
+export const USER_COOKIE_NAME = 'mt_user_session';
+
+// =========================================================================
+// Cryptographic Password Hashing (OWASP scrypt standard)
+// =========================================================================
+
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!storedHash) return false;
+  if (storedHash.startsWith('scrypt:')) {
+    const [, salt, hash] = storedHash.split(':');
+    const verifyHash = crypto.scryptSync(password, salt, 64).toString('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verifyHash, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+  // Backward compatibility with legacy plaintext accounts if any
+  return storedHash === password;
+}
+
+// =========================================================================
+// Student Session Management (Isolated from Admin)
+// =========================================================================
+
+export function createUserSessionToken(user: { id: string; email: string; name: string }): string {
+  const payload = {
+    id: user.id,
+    email: user.email.toLowerCase(),
+    name: user.name,
+    role: 'student',
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
+  };
+  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', USER_SESSION_SECRET)
+    .update(payloadB64)
+    .digest('base64url');
+  return `${payloadB64}.${signature}`;
+}
+
+export function verifyUserSessionToken(token?: string | null): {
+  valid: boolean;
+  user?: { id: string; email: string; name: string };
+} {
+  if (!token) return { valid: false };
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 2) return { valid: false };
+    const [payloadB64, signature] = parts;
+    const expectedSignature = crypto
+      .createHmac('sha256', USER_SESSION_SECRET)
+      .update(payloadB64)
+      .digest('base64url');
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+      return { valid: false };
+    }
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
+    if (payload.role !== 'student' || !payload.exp || Date.now() > payload.exp) {
+      return { valid: false };
+    }
+    return {
+      valid: true,
+      user: { id: payload.id, email: payload.email, name: payload.name }
+    };
+  } catch {
+    return { valid: false };
+  }
+}
+
+// =========================================================================
+// Validation Helpers
+// =========================================================================
 
 export function validateEmail(email: string): boolean {
   if (!email || typeof email !== 'string') return false;
@@ -36,18 +122,12 @@ export function validatePassword(password: string): { isValid: boolean; error?: 
   if (password.length < 6) {
     return { isValid: false, error: 'Password must be at least 6 characters long' };
   }
-  const hasNumber = /\d/.test(password);
-  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password);
-
-  if (!hasNumber) {
-    return { isValid: false, error: 'Password must include at least one number (0-9)' };
-  }
-  if (!hasSpecial) {
-    return { isValid: false, error: 'Password must include at least one special character (e.g. !@#$%^&*)' };
-  }
-
   return { isValid: true };
 }
+
+// =========================================================================
+// User Lookup & Core Registration
+// =========================================================================
 
 export async function findUserByEmail(email: string): Promise<UserAccount | undefined> {
   const cleanEmail = email.trim().toLowerCase();
@@ -70,39 +150,45 @@ export async function findUserByEmail(email: string): Promise<UserAccount | unde
   return undefined;
 }
 
-export async function registerUser(
-  email: string,
-  password: string,
-  name?: string
-): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
-  const cleanEmail = email.trim().toLowerCase();
+/**
+ * Creates a student account directly from Admin Dashboard
+ */
+export async function adminCreateUser(params: {
+  email: string;
+  password: string;
+  name?: string;
+  hasPaidConsultation?: boolean;
+}): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+  const cleanEmail = params.email.trim().toLowerCase();
 
   if (!validateEmail(cleanEmail)) {
     return { success: false, error: 'Please enter a valid email address' };
   }
 
-  const passValidation = validatePassword(password);
+  const passValidation = validatePassword(params.password);
   if (!passValidation.isValid) {
     return { success: false, error: passValidation.error };
   }
 
-  // Check if user exists in cache or Neon DB
   const existing = await findUserByEmail(cleanEmail);
   if (existing) {
-    return { success: false, error: 'An account with this email already exists. Please log in.' };
+    return { success: false, error: 'A student account with this email already exists.' };
   }
 
-  const hasPaid = consultationPaidEmails.has(cleanEmail);
+  const hashedPassword = hashPassword(params.password);
   const newUser: UserAccount = {
     id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     email: cleanEmail,
-    name: name?.trim() || cleanEmail.split('@')[0],
-    password,
-    hasPaidConsultation: hasPaid,
+    name: params.name?.trim() || cleanEmail.split('@')[0],
+    password: hashedPassword,
+    hasPaidConsultation: Boolean(params.hasPaidConsultation),
     createdAt: new Date().toISOString()
   };
 
   userStore.set(cleanEmail, newUser);
+  if (newUser.hasPaidConsultation) {
+    consultationPaidEmails.add(cleanEmail);
+  }
 
   // Persist to Neon PostgreSQL
   await neonSaveUser(newUser).catch((e) =>
@@ -110,6 +196,56 @@ export async function registerUser(
   );
 
   return { success: true, user: newUser };
+}
+
+/**
+ * Updates an existing student account from Admin Dashboard (Password / Name)
+ */
+export async function adminUpdateUser(params: {
+  email: string;
+  password?: string;
+  name?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const cleanEmail = params.email.trim().toLowerCase();
+
+  if (!validateEmail(cleanEmail)) {
+    return { success: false, error: 'Please enter a valid email address' };
+  }
+
+  const existing = await findUserByEmail(cleanEmail);
+  if (!existing) {
+    return { success: false, error: 'Student account not found' };
+  }
+
+  let hashedPassword: string | undefined = undefined;
+  if (params.password) {
+    const passValidation = validatePassword(params.password);
+    if (!passValidation.isValid) {
+      return { success: false, error: passValidation.error };
+    }
+    hashedPassword = hashPassword(params.password);
+  }
+
+  // Persist update to Neon PostgreSQL
+  await neonUpdateUser(cleanEmail, {
+    password: hashedPassword,
+    name: params.name?.trim()
+  });
+
+  // Update in-memory cache
+  if (hashedPassword) existing.password = hashedPassword;
+  if (params.name) existing.name = params.name.trim();
+  userStore.set(cleanEmail, existing);
+
+  return { success: true };
+}
+
+export async function registerUser(
+  email: string,
+  password: string,
+  name?: string
+): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+  return await adminCreateUser({ email, password, name });
 }
 
 export async function authenticateUser(
@@ -122,19 +258,22 @@ export async function authenticateUser(
     return { success: false, error: 'Please enter a valid email address' };
   }
 
-  let existing = await findUserByEmail(cleanEmail);
+  const existing = await findUserByEmail(cleanEmail);
   if (!existing) {
-    // If not found, check if password meets criteria to create an account on the fly or prompt
-    const passValidation = validatePassword(password);
-    if (!passValidation.isValid) {
-      return { success: false, error: passValidation.error };
-    }
-    // Auto-register first-time valid user for seamless onboarding
-    return await registerUser(cleanEmail, password);
+    return { success: false, error: 'Account not found. Please contact admin for your login credentials.' };
   }
 
-  if (existing.password !== password) {
-    return { success: false, error: 'Incorrect password. Try again or use Forgot Password.' };
+  const isPasswordValid = verifyPassword(password, existing.password);
+  if (!isPasswordValid) {
+    return { success: false, error: 'Incorrect password. Please verify and try again.' };
+  }
+
+  // Automatic upgrade: If stored password was legacy plaintext, upgrade to scrypt hash immediately
+  if (!existing.password.startsWith('scrypt:')) {
+    const upgradedHash = hashPassword(password);
+    existing.password = upgradedHash;
+    userStore.set(cleanEmail, existing);
+    await neonUpdateUserPassword(cleanEmail, upgradedHash).catch(() => {});
   }
 
   // Sync consultation status
@@ -150,34 +289,9 @@ export async function authenticateUser(
   return { success: true, user: existing };
 }
 
-export async function resetPassword(
-  email: string,
-  newPassword: string
-): Promise<{ success: boolean; error?: string }> {
-  const cleanEmail = email.trim().toLowerCase();
-
-  if (!validateEmail(cleanEmail)) {
-    return { success: false, error: 'Please enter a valid email address' };
-  }
-
-  const passValidation = validatePassword(newPassword);
-  if (!passValidation.isValid) {
-    return { success: false, error: passValidation.error };
-  }
-
-  const existing = await findUserByEmail(cleanEmail);
-  if (existing) {
-    existing.password = newPassword;
-    userStore.set(cleanEmail, existing);
-    await neonUpdateUserPassword(cleanEmail, newPassword).catch((e) =>
-      console.warn('Neon updatePassword note:', e)
-    );
-    return { success: true };
-  } else {
-    // Create new account with this new password
-    return await registerUser(cleanEmail, newPassword);
-  }
-}
+// =========================================================================
+// Consultation & Admin Operations
+// =========================================================================
 
 export async function markConsultationPaid(email: string): Promise<void> {
   const cleanEmail = email.trim().toLowerCase();

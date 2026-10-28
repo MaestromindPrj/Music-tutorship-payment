@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser } from '@/lib/auth';
+import { authenticateUser, createUserSessionToken, USER_COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +21,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    const sessionToken = createUserSessionToken(result.user);
+
+    const response = NextResponse.json({
       success: true,
       user: {
         id: result.user.id,
@@ -30,6 +32,19 @@ export async function POST(req: NextRequest) {
         hasPaidConsultation: result.user.hasPaidConsultation
       }
     });
+
+    // Set secure HTTP-only cookie for student session isolation
+    response.cookies.set({
+      name: USER_COOKIE_NAME,
+      value: sessionToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60 // 30 days
+    });
+
+    return response;
   } catch (err: any) {
     return NextResponse.json(
       { error: err?.message || 'Server error during login' },

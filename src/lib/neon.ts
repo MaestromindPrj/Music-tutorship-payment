@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { neon, neonConfig } from '@neondatabase/serverless';
 import https from 'https';
 import { Resolver } from 'dns';
@@ -188,6 +189,25 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
       );
     `;
 
+    // 5. Password Reset OTPs table
+    await sql`
+      CREATE TABLE IF NOT EXISTS password_reset_otps (
+        id VARCHAR(100) PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        reset_token VARCHAR(100),
+        attempts INT DEFAULT 0,
+        is_verified BOOLEAN DEFAULT FALSE,
+        is_used BOOLEAN DEFAULT FALSE,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `;
+
+    // Ensure columns for Google Auth exist
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
+
     // Indexes for fast lookups
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_email ON payments(email);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);`;
@@ -195,6 +215,7 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
     await sql`CREATE INDEX IF NOT EXISTS idx_registrations_email ON registrations(email);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_registrations_txnid ON registrations(txnid);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_password_reset_otps_email ON password_reset_otps(email);`;
 
     dbInitialized = true;
     return { success: true, message: 'Neon PostgreSQL schema initialized successfully.' };
@@ -222,7 +243,7 @@ export async function neonFindUserByEmail(email: string): Promise<UserAccount | 
 
   const cleanEmail = email.trim().toLowerCase();
   const rows = await sql`
-    SELECT id, email, name, password, has_paid_consultation, created_at, last_login_at
+    SELECT id, email, name, password, has_paid_consultation, google_id, avatar_url, created_at, last_login_at
     FROM users
     WHERE email = ${cleanEmail}
     LIMIT 1;
@@ -236,6 +257,8 @@ export async function neonFindUserByEmail(email: string): Promise<UserAccount | 
     name: row.name,
     password: row.password,
     hasPaidConsultation: Boolean(row.has_paid_consultation),
+    googleId: row.google_id || undefined,
+    avatarUrl: row.avatar_url || undefined,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
   };
 }
@@ -247,13 +270,15 @@ export async function neonSaveUser(user: UserAccount): Promise<boolean> {
 
   const cleanEmail = user.email.trim().toLowerCase();
   await sql`
-    INSERT INTO users (id, email, name, password, has_paid_consultation, created_at, updated_at, last_login_at)
+    INSERT INTO users (id, email, name, password, has_paid_consultation, google_id, avatar_url, created_at, updated_at, last_login_at)
     VALUES (
       ${user.id},
       ${cleanEmail},
       ${user.name},
       ${user.password},
       ${user.hasPaidConsultation},
+      ${user.googleId || null},
+      ${user.avatarUrl || null},
       NOW(),
       NOW(),
       NOW()
@@ -262,6 +287,8 @@ export async function neonSaveUser(user: UserAccount): Promise<boolean> {
       name = EXCLUDED.name,
       password = EXCLUDED.password,
       has_paid_consultation = EXCLUDED.has_paid_consultation,
+      google_id = COALESCE(users.google_id, EXCLUDED.google_id),
+      avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
       last_login_at = NOW(),
       updated_at = NOW();
   `;
@@ -277,6 +304,37 @@ export async function neonUpdateUserLastLogin(email: string): Promise<void> {
     SET last_login_at = NOW(), updated_at = NOW()
     WHERE email = ${cleanEmail};
   `.catch((e) => console.warn('neonUpdateUserLastLogin note:', e));
+}
+
+export async function neonUpdateUser(
+  email: string,
+  updates: { password?: string; name?: string }
+): Promise<boolean> {
+  const sql = getNeonSql();
+  if (!sql) return false;
+  await ensureDbInitialized();
+
+  const cleanEmail = email.trim().toLowerCase();
+  if (updates.password && updates.name) {
+    await sql`
+      UPDATE users
+      SET password = ${updates.password}, name = ${updates.name}, updated_at = NOW()
+      WHERE email = ${cleanEmail};
+    `;
+  } else if (updates.password) {
+    await sql`
+      UPDATE users
+      SET password = ${updates.password}, updated_at = NOW()
+      WHERE email = ${cleanEmail};
+    `;
+  } else if (updates.name) {
+    await sql`
+      UPDATE users
+      SET name = ${updates.name}, updated_at = NOW()
+      WHERE email = ${cleanEmail};
+    `;
+  }
+  return true;
 }
 
 export async function neonUpdateUserPassword(email: string, newPassword: string): Promise<boolean> {
@@ -329,9 +387,199 @@ export async function neonGetAllUsers(): Promise<Array<{
     email: r.email,
     name: r.name,
     hasPaidConsultation: Boolean(r.has_paid_consultation),
+    googleId: r.google_id || undefined,
+    avatarUrl: r.avatar_url || undefined,
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
     lastLoginAt: r.last_login_at ? new Date(r.last_login_at).toISOString() : new Date().toISOString()
   }));
+}
+
+// =========================================================================
+// Password Reset OTP Operations (Neon PostgreSQL)
+// =========================================================================
+
+export async function neonSaveOtp(email: string, otpCode: string, expiresAt: Date): Promise<boolean> {
+  const sql = getNeonSql();
+  if (!sql) return false;
+  await ensureDbInitialized();
+
+  const cleanEmail = email.trim().toLowerCase();
+  const id = `otp_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+
+  // Invalidate any existing unused OTPs for this email first
+  await sql`
+    UPDATE password_reset_otps
+    SET is_used = TRUE
+    WHERE email = ${cleanEmail} AND is_used = FALSE;
+  `;
+
+  await sql`
+    INSERT INTO password_reset_otps (id, email, otp_code, expires_at, created_at)
+    VALUES (${id}, ${cleanEmail}, ${otpCode}, ${expiresAt.toISOString()}, NOW());
+  `;
+
+  return true;
+}
+
+export async function neonVerifyOtp(
+  email: string,
+  otpCode: string
+): Promise<{ success: boolean; resetToken?: string; error?: string }> {
+  const sql = getNeonSql();
+  if (!sql) return { success: false, error: 'Database connection unavailable' };
+  await ensureDbInitialized();
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanOtp = otpCode.trim();
+
+  // Find latest active OTP for this email
+  const rows = await sql`
+    SELECT id, email, otp_code, attempts, is_verified, is_used, expires_at
+    FROM password_reset_otps
+    WHERE email = ${cleanEmail} AND is_used = FALSE
+    ORDER BY created_at DESC
+    LIMIT 1;
+  `;
+
+  if (!rows || rows.length === 0) {
+    return { success: false, error: 'No active OTP request found. Please request a new code.' };
+  }
+
+  const record = rows[0];
+
+  // Check if expired
+  if (new Date(record.expires_at).getTime() < Date.now()) {
+    await sql`UPDATE password_reset_otps SET is_used = TRUE WHERE id = ${record.id}`;
+    return { success: false, error: 'This verification code has expired. Please request a new one.' };
+  }
+
+  // Check attempts limit (max 5)
+  if (record.attempts >= 5) {
+    await sql`UPDATE password_reset_otps SET is_used = TRUE WHERE id = ${record.id}`;
+    return { success: false, error: 'Too many incorrect attempts. Please request a new code.' };
+  }
+
+  if (record.otp_code !== cleanOtp) {
+    await sql`
+      UPDATE password_reset_otps
+      SET attempts = attempts + 1
+      WHERE id = ${record.id};
+    `;
+    const remaining = 4 - record.attempts;
+    return {
+      success: false,
+      error: `Invalid verification code. ${remaining > 0 ? `${remaining} attempts remaining.` : 'Code locked. Please request a new one.'}`
+    };
+  }
+
+  // OTP verified! Generate single-use reset token
+  const resetToken = `rst_${Date.now()}_${crypto.randomBytes(16).toString('hex')}`;
+  await sql`
+    UPDATE password_reset_otps
+    SET is_verified = TRUE, reset_token = ${resetToken}
+    WHERE id = ${record.id};
+  `;
+
+  return { success: true, resetToken };
+}
+
+export async function neonResetPasswordWithToken(
+  email: string,
+  resetToken: string,
+  newHashedPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  const sql = getNeonSql();
+  if (!sql) return { success: false, error: 'Database connection unavailable' };
+  await ensureDbInitialized();
+
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanToken = resetToken.trim();
+
+  const rows = await sql`
+    SELECT id, email, is_verified, is_used, expires_at
+    FROM password_reset_otps
+    WHERE email = ${cleanEmail} AND reset_token = ${cleanToken} AND is_verified = TRUE AND is_used = FALSE
+    LIMIT 1;
+  `;
+
+  if (!rows || rows.length === 0) {
+    return { success: false, error: 'Invalid or expired reset token. Please verify OTP again.' };
+  }
+
+  const record = rows[0];
+
+  // Check token lifetime (15 mins from verification)
+  if (new Date(record.expires_at).getTime() + 15 * 60 * 1000 < Date.now()) {
+    await sql`UPDATE password_reset_otps SET is_used = TRUE WHERE id = ${record.id}`;
+    return { success: false, error: 'Reset session expired. Please request a new code.' };
+  }
+
+  // Update password in users table
+  await sql`
+    UPDATE users
+    SET password = ${newHashedPassword}, updated_at = NOW()
+    WHERE email = ${cleanEmail};
+  `;
+
+  // Invalidate OTP record
+  await sql`
+    UPDATE password_reset_otps
+    SET is_used = TRUE
+    WHERE id = ${record.id};
+  `;
+
+  return { success: true };
+}
+
+export async function neonUpsertGoogleUser(params: {
+  email: string;
+  name: string;
+  googleId: string;
+  avatarUrl?: string;
+}): Promise<UserAccount | null> {
+  const sql = getNeonSql();
+  if (!sql) return null;
+  await ensureDbInitialized();
+
+  const cleanEmail = params.email.trim().toLowerCase();
+  const id = `usr_g_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const randomPassHash = `google_oauth_${crypto.randomBytes(16).toString('hex')}`;
+
+  const rows = await sql`
+    INSERT INTO users (id, email, name, password, google_id, avatar_url, has_paid_consultation, created_at, updated_at, last_login_at)
+    VALUES (
+      ${id},
+      ${cleanEmail},
+      ${params.name.trim()},
+      ${randomPassHash},
+      ${params.googleId},
+      ${params.avatarUrl || null},
+      FALSE,
+      NOW(),
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (email) DO UPDATE SET
+      name = COALESCE(NULLIF(users.name, ''), EXCLUDED.name),
+      google_id = COALESCE(users.google_id, EXCLUDED.google_id),
+      avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+      last_login_at = NOW(),
+      updated_at = NOW()
+    RETURNING id, email, name, password, has_paid_consultation, google_id, avatar_url, created_at;
+  `;
+
+  if (!rows || rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    password: row.password,
+    hasPaidConsultation: Boolean(row.has_paid_consultation),
+    googleId: row.google_id || undefined,
+    avatarUrl: row.avatar_url || undefined,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
+  };
 }
 
 // =========================================================================

@@ -14,7 +14,6 @@ import {
   Download,
   RefreshCw,
   LogOut,
-  Database,
   Eye,
   EyeOff,
   CreditCard,
@@ -26,7 +25,12 @@ import {
   Loader2,
   Sparkles,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Send,
+  Key,
+  Share2,
+  MessageCircle
 } from 'lucide-react';
 import { PaymentRecord, StudentRegistration } from '@/types';
 
@@ -65,7 +69,6 @@ export default function AdminPage() {
 
   // Dashboard data state
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [neonConnected, setNeonConnected] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalRevenue: 0,
     totalPayments: 0,
@@ -80,7 +83,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
 
   // Navigation & filter state
-  const [activeTab, setActiveTab] = useState<'payments' | 'registrations' | 'users' | 'neon'>('payments');
+  const [activeTab, setActiveTab] = useState<'payments' | 'registrations' | 'users'>('payments');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'PENDING' | 'FAILED'>('ALL');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'COURSE' | 'CONSULTATION'>('ALL');
@@ -91,10 +94,32 @@ export default function AdminPage() {
     registration?: StudentRegistration | null;
   } | null>(null);
 
-  // DB initialization status
-  const [isInitializingDb, setIsInitializingDb] = useState(false);
-  const [initDbResult, setInitDbResult] = useState<{ success: boolean; message: string } | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  // Add User Modal state
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [addUserError, setAddUserError] = useState('');
+  const [createdUserSuccess, setCreatedUserSuccess] = useState<{
+    name: string;
+    email: string;
+    password: string;
+  } | null>(null);
+
+  // Edit User / Change Password Modal state
+  const [editingUser, setEditingUser] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+  const [editUserError, setEditUserError] = useState('');
+  const [editUserSuccess, setEditUserSuccess] = useState<{
+    name: string;
+    email: string;
+    password?: string;
+  } | null>(null);
 
   // Check auth on mount
   useEffect(() => {
@@ -170,7 +195,6 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/data');
       if (res.ok) {
         const data = await res.json();
-        setNeonConnected(Boolean(data.neonConnected));
         if (data.stats) setStats(data.stats);
         if (data.payments) setPayments(data.payments);
         if (data.registrations) setRegistrations(data.registrations);
@@ -183,23 +207,107 @@ export default function AdminPage() {
     }
   };
 
-  const handleInitDb = async () => {
-    setIsInitializingDb(true);
-    setInitDbResult(null);
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    let pwd = 'MT@';
+    for (let i = 0; i < 7; i++) {
+      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    pwd += '!';
+    setNewUserPassword(pwd);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddUserError('');
+
+    if (!newUserEmail.trim() || !newUserEmail.includes('@')) {
+      setAddUserError('Please enter a valid email address.');
+      return;
+    }
+    if (!newUserPassword || newUserPassword.length < 6) {
+      setAddUserError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsCreatingUser(true);
     try {
-      const res = await fetch('/api/admin/init-db', { method: 'POST' });
-      const data = await res.json();
-      setInitDbResult({
-        success: data.success,
-        message: data.message || (data.success ? 'Tables verified/initialized.' : data.error || 'Initialization failed.')
+      const res = await fetch('/api/admin/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newUserName.trim() || newUserEmail.split('@')[0],
+          email: newUserEmail.trim().toLowerCase(),
+          password: newUserPassword,
+          hasPaidConsultation: false
+        })
       });
+      const data = await res.json();
+      setIsCreatingUser(false);
+
       if (data.success) {
+        setCreatedUserSuccess({
+          name: newUserName.trim() || newUserEmail.split('@')[0],
+          email: newUserEmail.trim().toLowerCase(),
+          password: newUserPassword
+        });
         fetchDashboardData();
+      } else {
+        setAddUserError(data.error || 'Failed to create student account.');
       }
     } catch (err: any) {
-      setInitDbResult({ success: false, message: err?.message || 'Failed to initialize database.' });
-    } finally {
-      setIsInitializingDb(false);
+      setIsCreatingUser(false);
+      setAddUserError(err?.message || 'Connection error.');
+    }
+  };
+
+  const generateEditRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    let pwd = 'MT@';
+    for (let i = 0; i < 7; i++) {
+      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    pwd += '!';
+    setEditPassword(pwd);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditUserError('');
+
+    if (editPassword && editPassword.length < 6) {
+      setEditUserError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setIsUpdatingUser(true);
+    try {
+      const res = await fetch('/api/admin/users/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: editingUser.email,
+          password: editPassword || undefined,
+          name: editName.trim() || undefined
+        })
+      });
+      const data = await res.json();
+      setIsUpdatingUser(false);
+
+      if (data.success) {
+        setEditUserSuccess({
+          name: editName.trim() || editingUser.name,
+          email: editingUser.email,
+          password: editPassword || undefined
+        });
+        fetchDashboardData();
+      } else {
+        setEditUserError(data.error || 'Failed to update user credentials.');
+      }
+    } catch (err: any) {
+      setIsUpdatingUser(false);
+      setEditUserError(err?.message || 'Connection error.');
     }
   };
 
@@ -369,9 +477,9 @@ export default function AdminPage() {
       `"${u.id}"`,
       `"${u.name}"`,
       `"${u.email}"`,
-      u.hasPaidConsultation ? 'YES (₹10k credit)' : 'NO',
+      `"${u.hasPaidConsultation ? 'YES' : 'NO'}"`,
       `"${u.createdAt}"`,
-      `"${u.lastLoginAt || u.createdAt}"`
+      `"${u.lastLoginAt || ''}"`
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
@@ -384,85 +492,121 @@ export default function AdminPage() {
     document.body.removeChild(link);
   };
 
-  // Loading state during initial session check
+  // WhatsApp formatted share link for created student
+  const whatsappShareUrl = createdUserSuccess
+    ? `https://wa.me/?text=${encodeURIComponent(
+        `Hello ${createdUserSuccess.name}!\n\nYour Music Tutorship Student Portal account has been created.\n\n🌐 Portal: https://payments.musictutorship.in\n📧 Email: ${createdUserSuccess.email}\n🔑 Password: ${createdUserSuccess.password}\n\nPlease log in to access your course materials and consultations.`
+      )}`
+    : '#';
+
+  // WhatsApp formatted share link for updated student credentials
+  const whatsappEditShareUrl = editUserSuccess?.password
+    ? `https://wa.me/?text=${encodeURIComponent(
+        `Hello ${editUserSuccess.name}!\n\nYour Music Tutorship Student Portal credentials have been updated.\n\n🌐 Portal: https://payments.musictutorship.in\n📧 Email: ${editUserSuccess.email}\n🔑 New Password: ${editUserSuccess.password}\n\nPlease log in using your updated password.`
+      )}`
+    : '#';
+
+  // =========================================================================
+  // Screen 0: Initial Auth Verification Guard (Zero Flash)
+  // =========================================================================
   if (isAuthenticated === null) {
     return (
-      <div className="container" style={{ padding: '80px 24px', textAlign: 'center' }}>
-        <Loader2 size={32} style={{ color: '#000000', margin: '0 auto 12px auto', animation: 'spin 1s linear infinite' }} />
-        <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Verifying Admin Authentication...</h2>
+      <div style={{
+        minHeight: '60vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        color: '#64748b'
+      }}>
+        <Loader2 className="animate-spin" size={28} style={{ color: '#0f172a' }} />
+        <span style={{ fontSize: '13px', fontWeight: 600 }}>Verifying administrator session...</span>
       </div>
     );
   }
 
   // =========================================================================
-  // Screen 1: Admin Login Screen (Matches User Design System)
+  // Screen 1: Unauthenticated Admin Login
   // =========================================================================
-  if (!isAuthenticated) {
+  if (isAuthenticated === false) {
     return (
-      <div className="container" style={{ padding: '48px 24px 80px 24px', maxWidth: '480px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <span className="section-overline">
-            SECURE ACCESS
-          </span>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-            Admin Portal Login
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '13px' }}>
-            Sign in to manage payments, enrollments, and student KYC registrations.
-          </p>
-        </div>
-
-        <div className="clean-card" style={{ padding: '32px' }}>
-          {loginError && (
+      <div className="container" style={{ padding: '60px 24px', maxWidth: '440px' }}>
+        <div className="clean-card" style={{ padding: '36px 32px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div style={{
-              backgroundColor: 'rgba(185, 28, 28, 0.08)',
-              border: '1px solid #fca5a5',
-              padding: '12px 14px',
-              marginBottom: '20px',
-              color: '#b91c1c',
-              fontSize: '13px',
+              width: '48px',
+              height: '48px',
+              backgroundColor: '#0f172a',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              justifyContent: 'center',
+              margin: '0 auto 12px auto'
             }}>
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <Shield size={24} style={{ color: '#ffffff' }} />
+            </div>
+            <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+              Administrator Access
+            </h1>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+              Authorized Music Tutorship staff only
+            </p>
+          </div>
+
+          {loginError && (
+            <div style={{
+              padding: '10px 14px',
+              backgroundColor: 'rgba(185, 28, 28, 0.08)',
+              color: '#b91c1c',
+              fontSize: '12px',
+              marginBottom: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: '1px solid #fecaca'
+            }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
               <span>{loginError}</span>
             </div>
           )}
 
           <form onSubmit={handleLogin}>
-            {/* Email */}
-            <div className="form-group" style={{ marginBottom: '18px' }}>
-              <label className="form-label" htmlFor="adminEmail">
-                <span>ADMIN MAIL ID *</span>
-              </label>
-              <input
-                id="adminEmail"
-                type="email"
-                required
-                className="form-input"
-                placeholder="admin@musictutorship.in"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-              />
-            </div>
-
-            {/* Password */}
-            <div className="form-group" style={{ marginBottom: '24px' }}>
-              <label className="form-label" htmlFor="adminPassword">
-                <span>ADMIN PASSWORD *</span>
+            <div className="form-group" style={{ marginBottom: '14px' }}>
+              <label className="form-label" htmlFor="admin-email">
+                <span>Admin Email *</span>
               </label>
               <div style={{ position: 'relative' }}>
                 <input
-                  id="adminPassword"
+                  id="admin-email"
+                  type="email"
+                  required
+                  autoFocus
+                  className="form-input"
+                  placeholder="admin@musictutorship.in"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  style={{ paddingLeft: '36px' }}
+                />
+                <Mail size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#94a3b8' }} />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label className="form-label" htmlFor="admin-password">
+                <span>Password *</span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="admin-password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   className="form-input"
-                  placeholder="Enter admin password"
+                  placeholder="Enter administrator password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  style={{ paddingRight: '40px' }}
+                  style={{ paddingLeft: '36px', paddingRight: '36px' }}
                 />
+                <Lock size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#94a3b8' }} />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -482,19 +626,21 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoggingIn}
               className="btn-primary"
-              style={{ width: '100%', padding: '13px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
             >
-              {isLoggingIn ? (
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <Lock size={15} />
-              )}
-              <span>{isLoggingIn ? 'AUTHENTICATING...' : 'SIGN IN TO ADMIN PORTAL'}</span>
+              {isLoggingIn ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
+              <span>{isLoggingIn ? 'Authenticating...' : 'Sign In as Administrator'}</span>
             </button>
           </form>
 
@@ -507,7 +653,7 @@ export default function AdminPage() {
             lineHeight: 1.5,
             textAlign: 'center'
           }}>
-            Default Admin Login: <strong style={{ color: '#0f172a' }}>admin@musictutorship.in</strong> / Password: <strong style={{ color: '#0f172a' }}>Admin@MusicTutorship2025</strong>
+            Protected Administrator Area • Music Tutorship
           </div>
         </div>
       </div>
@@ -515,11 +661,11 @@ export default function AdminPage() {
   }
 
   // =========================================================================
-  // Screen 2: Authenticated Admin Dashboard (Matches User Design System)
+  // Screen 2: Authenticated Admin Dashboard with Sidebar Layout
   // =========================================================================
   return (
-    <div className="container" style={{ padding: '32px 24px 80px 24px', maxWidth: '1240px' }}>
-      {/* Admin Top Action Header (Clean User-Facing Style) */}
+    <div className="container" style={{ padding: '32px 32px 80px 32px', maxWidth: '1600px', width: '100%' }}>
+      {/* Admin Top Action Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -531,40 +677,16 @@ export default function AdminPage() {
         borderBottom: '1px solid #e2e8f0'
       }}>
         <div>
-          <span className="section-overline">
-            ADMINISTRATION PORTAL
-          </span>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px 0' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px 0' }}>
             Payments & Enrollment Dashboard
           </h1>
           <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-            Live sync with Neon PostgreSQL database • payments.musictutorship.in
+            Payments & Enrollment details • payments.musictutorship.in
           </p>
         </div>
 
         {/* Top Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* Database indicator */}
-          <button
-            onClick={() => setActiveTab('neon')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              borderRadius: '0px',
-              fontSize: '12px',
-              fontWeight: 700,
-              backgroundColor: neonConnected ? 'rgba(21, 128, 61, 0.08)' : 'rgba(234, 179, 8, 0.12)',
-              color: neonConnected ? '#15803d' : '#854d0e',
-              border: `1px solid ${neonConnected ? '#bbf7d0' : '#fde68a'}`,
-              cursor: 'pointer'
-            }}
-          >
-            <Database size={13} />
-            <span>{neonConnected ? 'Neon Database: Active' : 'Neon Setup Needed'}</span>
-          </button>
-
           {/* Refresh Button */}
           <button
             onClick={fetchDashboardData}
@@ -620,683 +742,1171 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Metric Overview Cards (Clean User-Facing Cards) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '16px',
-        marginBottom: '28px'
-      }}>
-        {/* Total Revenue */}
-        <div className="clean-card" style={{ padding: '20px 24px' }}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Total Revenue
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
-            ₹{stats.totalRevenue.toLocaleString('en-IN')}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-            From {stats.successPayments} completed enrollments
-          </div>
-        </div>
-
-        {/* Successful Enrollments */}
-        <div className="clean-card" style={{ padding: '20px 24px' }}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Successful Payments
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
-            {stats.successPayments}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-            {stats.pendingPayments} pending • {stats.failedPayments} failed
-          </div>
-        </div>
-
-        {/* Submitted KYC Profiles */}
-        <div className="clean-card" style={{ padding: '20px 24px' }}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            KYC Registrations
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
-            {stats.totalRegistrations}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-            Submitted 9-field student profiles
-          </div>
-        </div>
-
-        {/* Registered Users */}
-        <div className="clean-card" style={{ padding: '20px 24px' }}>
-          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Registered Users
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 800, color: '#b8871b', marginTop: '6px' }}>
-            {stats.totalUsers}
-          </div>
-          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-            Total user accounts in database
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs Navigation (Clean Sharp Style) */}
+      {/* Main Dashboard Layout with Sidebar */}
       <div style={{
         display: 'flex',
-        borderBottom: '1px solid #e2e8f0',
-        marginBottom: '24px',
-        gap: '4px',
-        overflowX: 'auto'
+        gap: '24px',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap'
       }}>
-        <button
-          onClick={() => setActiveTab('payments')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 20px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: activeTab === 'payments' ? '#000000' : '#64748b',
-            borderBottom: `2px solid ${activeTab === 'payments' ? '#000000' : 'transparent'}`,
-            backgroundColor: activeTab === 'payments' ? '#ffffff' : 'transparent',
-            borderLeft: 'none',
-            borderRight: 'none',
-            borderTop: 'none',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}
-        >
-          <CreditCard size={15} />
-          <span>Payments & Enrollments ({payments.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('registrations')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 20px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: activeTab === 'registrations' ? '#000000' : '#64748b',
-            borderBottom: `2px solid ${activeTab === 'registrations' ? '#000000' : 'transparent'}`,
-            backgroundColor: activeTab === 'registrations' ? '#ffffff' : 'transparent',
-            borderLeft: 'none',
-            borderRight: 'none',
-            borderTop: 'none',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}
-        >
-          <FileText size={15} />
-          <span>Student KYC Details ({registrations.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('users')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 20px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: activeTab === 'users' ? '#000000' : '#64748b',
-            borderBottom: `2px solid ${activeTab === 'users' ? '#000000' : 'transparent'}`,
-            backgroundColor: activeTab === 'users' ? '#ffffff' : 'transparent',
-            borderLeft: 'none',
-            borderRight: 'none',
-            borderTop: 'none',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}
-        >
-          <Users size={15} />
-          <span>Logged In Users ({users.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('neon')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 20px',
-            fontSize: '13px',
-            fontWeight: 700,
-            color: activeTab === 'neon' ? '#000000' : '#64748b',
-            borderBottom: `2px solid ${activeTab === 'neon' ? '#000000' : 'transparent'}`,
-            backgroundColor: activeTab === 'neon' ? '#ffffff' : 'transparent',
-            borderLeft: 'none',
-            borderRight: 'none',
-            borderTop: 'none',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}
-        >
-          <Database size={15} />
-          <span>Neon Database Status</span>
-        </button>
-      </div>
-
-      {/* Filter and Search Bar */}
-      {activeTab !== 'neon' && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '12px',
-          marginBottom: '20px',
-          flexWrap: 'wrap'
-        }}>
-          {/* Search Input */}
-          <div style={{ position: 'relative', flex: '1', minWidth: '260px', maxWidth: '440px' }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '13px', color: '#64748b' }} />
-            <input
-              type="text"
-              className="form-input"
-              placeholder={
-                activeTab === 'payments'
-                  ? 'Search by Txn ID, student name, email, phone...'
-                  : activeTab === 'registrations'
-                  ? 'Search by name, Aadhaar, PAN, email, phone...'
-                  : 'Search by user name or email...'
-              }
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '36px' }}
-            />
-          </div>
-
-          {/* Filters for Payments */}
-          {activeTab === 'payments' && (
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <select
-                className="form-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                style={{ width: 'auto', padding: '10px 14px', fontSize: '13px' }}
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="SUCCESS">Success Only</option>
-                <option value="PENDING">Pending Only</option>
-                <option value="FAILED">Failed Only</option>
-              </select>
-
-              <select
-                className="form-select"
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as any)}
-                style={{ width: 'auto', padding: '10px 14px', fontSize: '13px' }}
-              >
-                <option value="ALL">All Programs</option>
-                <option value="COURSE">Courses Only</option>
-                <option value="CONSULTATION">1-on-1 Consultations Only</option>
-              </select>
-            </div>
-          )}
-
-          {/* Export to CSV */}
-          <button
-            onClick={() => {
-              if (activeTab === 'payments') exportPaymentsToCSV();
-              else if (activeTab === 'registrations') exportRegistrationsToCSV();
-              else if (activeTab === 'users') exportUsersToCSV();
-            }}
-            className="btn-ghost"
-            style={{
-              padding: '10px 16px',
-              fontSize: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Download size={14} />
-            <span>EXPORT CSV</span>
-          </button>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB 1: Payments & Enrollments ("Who Paid For What") */}
-      {/* =================================================================== */}
-      {activeTab === 'payments' && (
-        <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <th style={{ padding: '14px 18px' }}>Student / Contact</th>
-                  <th style={{ padding: '14px 18px' }}>Purchased Program</th>
-                  <th style={{ padding: '14px 18px' }}>Amount</th>
-                  <th style={{ padding: '14px 18px' }}>Status</th>
-                  <th style={{ padding: '14px 18px' }}>Transaction ID</th>
-                  <th style={{ padding: '14px 18px' }}>Date</th>
-                  <th style={{ padding: '14px 18px' }}>KYC Status</th>
-                  <th style={{ padding: '14px 18px' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPayments.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                      No payments found matching your filter criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPayments.map((p) => {
-                    const isConsultation =
-                      p.courseId === 'call-consultation' ||
-                      p.courseName?.toLowerCase().includes('consultation');
-
-                    return (
-                      <tr key={p.txnid} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                        {/* Student */}
-                        <td style={{ padding: '16px 18px' }}>
-                          <div style={{ fontWeight: 700, color: '#0f172a' }}>
-                            {p.registration?.fullName || p.studentName || 'Student'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                            {p.email}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                            {p.phone}
-                          </div>
-                        </td>
-
-                        {/* Program */}
-                        <td style={{ padding: '16px 18px', maxWidth: '260px' }}>
-                          <span style={{
-                            display: 'inline-block',
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            padding: '2px 6px',
-                            marginBottom: '4px',
-                            backgroundColor: isConsultation ? 'rgba(234, 179, 8, 0.12)' : 'rgba(15, 23, 42, 0.08)',
-                            color: isConsultation ? '#854d0e' : '#0f172a'
-                          }}>
-                            {isConsultation ? '1-ON-1 CALL' : 'COURSE ENROLLMENT'}
-                          </span>
-                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '13px', lineHeight: 1.4 }}>
-                            {p.courseName}
-                          </div>
-                        </td>
-
-                        {/* Amount */}
-                        <td style={{ padding: '16px 18px', fontWeight: 800, color: '#000000', whiteSpace: 'nowrap' }}>
-                          ₹{Number(p.amount).toLocaleString('en-IN')}
-                        </td>
-
-                        {/* Status */}
-                        <td style={{ padding: '16px 18px' }}>
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '3px 8px',
-                            backgroundColor:
-                              p.status === 'SUCCESS'
-                                ? 'rgba(21, 128, 61, 0.10)'
-                                : p.status === 'PENDING'
-                                ? 'rgba(234, 179, 8, 0.12)'
-                                : 'rgba(185, 28, 28, 0.10)',
-                            color:
-                              p.status === 'SUCCESS'
-                                ? '#15803d'
-                                : p.status === 'PENDING'
-                                ? '#854d0e'
-                                : '#b91c1c'
-                          }}>
-                            {p.status === 'SUCCESS' && <CheckCircle2 size={12} />}
-                            {p.status === 'PENDING' && <Clock size={12} />}
-                            {p.status === 'FAILED' && <AlertCircle size={12} />}
-                            <span>{p.status}</span>
-                          </span>
-                        </td>
-
-                        {/* Txn ID */}
-                        <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#0f172a' }}>
-                          <div>{p.txnid}</div>
-                          {p.payuId && <div style={{ color: '#64748b' }}>PayU: {p.payuId}</div>}
-                        </td>
-
-                        {/* Date */}
-                        <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                        </td>
-
-                        {/* KYC Status */}
-                        <td style={{ padding: '16px 18px' }}>
-                          {p.registration ? (
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: '#15803d',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <Check size={12} />
-                              <span>Completed</span>
-                            </span>
-                          ) : isConsultation ? (
-                            <span style={{ fontSize: '11px', color: '#64748b' }}>Not Required</span>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: '#854d0e', fontWeight: 600 }}>Pending Form</span>
-                          )}
-                        </td>
-
-                        {/* Action */}
-                        <td style={{ padding: '16px 18px' }}>
-                          <button
-                            onClick={() => setSelectedStudentDetails({ payment: p, registration: p.registration })}
-                            className="btn-ghost"
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '11px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Eye size={12} />
-                            <span>VIEW DETAILS</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB 2: Submitted Student Details (KYC Details post-payment) */}
-      {/* =================================================================== */}
-      {activeTab === 'registrations' && (
-        <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              Submitted Student Enrollment KYC Records (9 Fields)
-            </h2>
-            <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>
-              All details submitted by students after completing course payment.
-            </p>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <th style={{ padding: '14px 18px' }}>Student Name</th>
-                  <th style={{ padding: '14px 18px' }}>DOB & Gender</th>
-                  <th style={{ padding: '14px 18px' }}>Contact</th>
-                  <th style={{ padding: '14px 18px' }}>Aadhaar & PAN</th>
-                  <th style={{ padding: '14px 18px' }}>Occupation</th>
-                  <th style={{ padding: '14px 18px' }}>Residential Address</th>
-                  <th style={{ padding: '14px 18px' }}>Transaction ID</th>
-                  <th style={{ padding: '14px 18px' }}>Submitted On</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRegistrations.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                      No student KYC registration details recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRegistrations.map((r) => (
-                    <tr key={r.txnid} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0f172a' }}>
-                        {r.fullName}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px', color: '#334155' }}>
-                        <div>{r.dob || '—'}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{r.gender}</div>
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px' }}>
-                        <div style={{ color: '#0f172a', fontWeight: 500 }}>{r.email}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>{r.phone}</div>
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px' }}>
-                        <div style={{ color: '#15803d', fontWeight: 600 }}>Aadhaar: {r.aadharCard}</div>
-                        <div style={{ color: '#854d0e', fontWeight: 600 }}>PAN: {r.pan}</div>
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px', color: '#334155' }}>
-                        {r.occupation || '—'}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', maxWidth: '240px' }}>
-                        {r.address}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#0f172a' }}>
-                        {r.txnid}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                        {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB 3: Logged In Users ("Who are the users loggedin") */}
-      {/* =================================================================== */}
-      {activeTab === 'users' && (
-        <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-              Registered & Logged In User Accounts
-            </h2>
-            <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>
-              All users who authenticated or created an account on payments.musictutorship.in.
-            </p>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <th style={{ padding: '14px 18px' }}>User Name</th>
-                  <th style={{ padding: '14px 18px' }}>Mail ID</th>
-                  <th style={{ padding: '14px 18px' }}>Consultation Status</th>
-                  <th style={{ padding: '14px 18px' }}>Account ID</th>
-                  <th style={{ padding: '14px 18px' }}>Registered On</th>
-                  <th style={{ padding: '14px 18px' }}>Last Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                      No registered user accounts found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredUsers.map((u) => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0f172a' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '28px',
-                            height: '28px',
-                            backgroundColor: '#f1f5f9',
-                            border: '1px solid #cbd5e1',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#0f172a',
-                            fontSize: '11px',
-                            fontWeight: 700
-                          }}>
-                            {(u.name || u.email).substring(0, 2).toUpperCase()}
-                          </div>
-                          <span>{u.name || 'Student'}</span>
-                        </div>
-                      </td>
-
-                      <td style={{ padding: '16px 18px', color: '#334155' }}>
-                        {u.email}
-                      </td>
-
-                      <td style={{ padding: '16px 18px' }}>
-                        {u.hasPaidConsultation ? (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 8px',
-                            backgroundColor: 'rgba(234, 179, 8, 0.12)',
-                            color: '#854d0e',
-                            fontSize: '11px',
-                            fontWeight: 700
-                          }}>
-                            <Sparkles size={11} />
-                            <span>Paid (₹10,000 Credit Active)</span>
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>
-                            Standard Account
-                          </span>
-                        )}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
-                        {u.id}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                      </td>
-
-                      <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB 4: Neon Database Status & Documentation */}
-      {/* =================================================================== */}
-      {activeTab === 'neon' && (
-        <div className="clean-card" style={{ padding: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <Database size={20} style={{ color: '#15803d' }} />
-            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Neon PostgreSQL Database Connection
-            </h2>
-          </div>
-          <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.6, marginBottom: '24px' }}>
-            Your application backend is completely integrated with Neon PostgreSQL (`@neondatabase/serverless`). All student accounts, payments, and post-payment KYC registrations are stored directly in your cloud PostgreSQL database.
-          </p>
-
-          <div style={{
-            backgroundColor: neonConnected ? 'rgba(21, 128, 61, 0.06)' : 'rgba(234, 179, 8, 0.10)',
-            border: `1px solid ${neonConnected ? '#bbf7d0' : '#fde68a'}`,
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <div>
-              <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>
-                DATABASE STATUS
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 800, color: neonConnected ? '#15803d' : '#854d0e', marginTop: '2px' }}>
-                {neonConnected ? '✓ Neon PostgreSQL is active and connected' : '⚠ DATABASE_URL not yet configured'}
-              </div>
-            </div>
-
-            <button
-              onClick={handleInitDb}
-              disabled={isInitializingDb}
-              className="btn-primary"
-              style={{
-                width: 'auto',
-                padding: '8px 16px',
-                fontSize: '12px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              {isInitializingDb ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={13} />}
-              <span>{isInitializingDb ? 'VERIFYING...' : 'VERIFY / RE-INITIALIZE TABLES'}</span>
-            </button>
-          </div>
-
-          {initDbResult && (
+        {/* =============================================================== */}
+        {/* SIDEBAR NAVIGATION */}
+        {/* =============================================================== */}
+        <aside style={{ width: '270px', flexShrink: 0, minWidth: '240px' }}>
+          <div className="clean-card" style={{ padding: '16px', marginBottom: '16px' }}>
             <div style={{
-              padding: '12px 16px',
-              marginBottom: '20px',
-              backgroundColor: initDbResult.success ? 'rgba(21, 128, 61, 0.08)' : 'rgba(185, 28, 28, 0.08)',
-              border: `1px solid ${initDbResult.success ? '#bbf7d0' : '#fca5a5'}`,
-              color: initDbResult.success ? '#15803d' : '#b91c1c',
-              fontSize: '13px'
+              fontSize: '11px',
+              fontWeight: 700,
+              color: '#94a3b8',
+              textTransform: 'uppercase',
+              letterSpacing: '0.8px',
+              padding: '4px 8px 12px 8px',
+              borderBottom: '1px solid #e2e8f0',
+              marginBottom: '10px'
             }}>
-              {initDbResult.message}
+              MANAGEMENT TABS
             </div>
-          )}
 
-          {/* Database Tables Summary */}
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {/* Sidetab 1: Payments & Enrollments */}
+              <button
+                onClick={() => setActiveTab('payments')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: activeTab === 'payments' ? '#0f172a' : 'transparent',
+                  color: activeTab === 'payments' ? '#ffffff' : '#334155',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <CreditCard size={16} />
+                  <span>Payments & Enrollments</span>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  backgroundColor: activeTab === 'payments' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  color: activeTab === 'payments' ? '#ffffff' : '#475569'
+                }}>
+                  {payments.length}
+                </span>
+              </button>
+
+              {/* Sidetab 2: Student KYC Details */}
+              <button
+                onClick={() => setActiveTab('registrations')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: activeTab === 'registrations' ? '#0f172a' : 'transparent',
+                  color: activeTab === 'registrations' ? '#ffffff' : '#334155',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <FileText size={16} />
+                  <span>Student KYC Details</span>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  backgroundColor: activeTab === 'registrations' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  color: activeTab === 'registrations' ? '#ffffff' : '#475569'
+                }}>
+                  {registrations.length}
+                </span>
+              </button>
+
+              {/* Sidetab 3: Logged In Users */}
+              <button
+                onClick={() => setActiveTab('users')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: activeTab === 'users' ? '#0f172a' : 'transparent',
+                  color: activeTab === 'users' ? '#ffffff' : '#334155',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Users size={16} />
+                  <span>Logged In Users</span>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  backgroundColor: activeTab === 'users' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  color: activeTab === 'users' ? '#ffffff' : '#475569'
+                }}>
+                  {users.length}
+                </span>
+              </button>
+            </nav>
+
+            {/* Sidebar Quick Action: Add User */}
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                onClick={() => {
+                  setIsAddUserOpen(true);
+                  setCreatedUserSuccess(null);
+                  setAddUserError('');
+                  setNewUserName('');
+                  setNewUserEmail('');
+                  generateRandomPassword();
+                }}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Plus size={14} />
+                <span>ADD USER</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* =============================================================== */}
+        {/* MAIN DATA VIEW AREA */}
+        {/* =============================================================== */}
+        <main style={{ flex: 1, minWidth: 0, width: '100%' }}>
+          {/* Metric Overview Cards */}
           <div style={{
-            border: '1px solid #e2e8f0',
-            backgroundColor: '#f8fafc',
-            padding: '16px 20px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
             marginBottom: '24px'
           }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
-              Initialized PostgreSQL Tables:
+            {/* Total Revenue */}
+            <div className="clean-card" style={{ padding: '20px 24px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Total Revenue
+              </div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
+                ₹{stats.totalRevenue.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                From {stats.successPayments} enrollments
+              </div>
             </div>
-            <ul style={{ fontSize: '12px', color: '#334155', lineHeight: 1.8, paddingLeft: '18px', margin: 0 }}>
-              <li><strong style={{ color: '#0f172a' }}>users</strong>: Stores all student logins, accounts, passwords, and consultation credits.</li>
-              <li><strong style={{ color: '#0f172a' }}>payments</strong>: Stores all PayU payment records (amount, course name, course ID, status, PayU IDs, mode).</li>
-              <li><strong style={{ color: '#0f172a' }}>registrations</strong>: Stores the 9 KYC post-payment enrollment fields entered by students.</li>
-              <li><strong style={{ color: '#0f172a' }}>admin_users</strong>: Stores administrator credentials.</li>
-            </ul>
+
+            {/* Successful Enrollments */}
+            <div className="clean-card" style={{ padding: '20px 24px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Successful Payments
+              </div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
+                {stats.successPayments}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                {stats.pendingPayments} pending • {stats.failedPayments} failed
+              </div>
+            </div>
+
+            {/* Submitted KYC Profiles */}
+            <div className="clean-card" style={{ padding: '20px 24px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                KYC Registrations
+              </div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#000000', marginTop: '6px' }}>
+                {stats.totalRegistrations}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                Post-payment profiles
+              </div>
+            </div>
+
+            {/* Registered Users */}
+            <div className="clean-card" style={{ padding: '20px 24px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Student Accounts
+              </div>
+              <div style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
+                {stats.totalUsers}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                Accounts in database
+              </div>
+            </div>
+          </div>
+
+          {/* Filter and Search Bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '20px',
+            width: '100%',
+            flexWrap: 'wrap'
+          }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                className="form-input"
+                placeholder={
+                  activeTab === 'payments'
+                    ? 'Search by Txn ID, student name, email, phone...'
+                    : activeTab === 'registrations'
+                    ? 'Search by name, Aadhaar, PAN, email, phone...'
+                    : 'Search by user name or email...'
+                }
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  paddingLeft: '36px',
+                  paddingRight: '12px',
+                  width: '100%',
+                  height: '40px',
+                  boxSizing: 'border-box',
+                  fontSize: '13px'
+                }}
+              />
+            </div>
+
+            {/* Filters for Payments */}
+            {activeTab === 'payments' && (
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select
+                  className="form-select"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  style={{ width: 'auto', padding: '0 12px', height: '40px', boxSizing: 'border-box', fontSize: '13px' }}
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="SUCCESS">Success Only</option>
+                  <option value="PENDING">Pending Only</option>
+                  <option value="FAILED">Failed Only</option>
+                </select>
+
+                <select
+                  className="form-select"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  style={{ width: 'auto', padding: '0 12px', height: '40px', boxSizing: 'border-box', fontSize: '13px' }}
+                >
+                  <option value="ALL">All Programs</option>
+                  <option value="COURSE">Courses Only</option>
+                  <option value="CONSULTATION">Call Consultations Only</option>
+                </select>
+              </div>
+            )}
+
+            {/* Right Action Buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: 'auto' }}>
+              {activeTab === 'users' && (
+                <button
+                  onClick={() => {
+                    setIsAddUserOpen(true);
+                    setCreatedUserSuccess(null);
+                    setAddUserError('');
+                    setNewUserName('');
+                    setNewUserEmail('');
+                    generateRandomPassword();
+                  }}
+                  className="btn-primary"
+                  style={{
+                    height: '40px',
+                    boxSizing: 'border-box',
+                    padding: '0 16px',
+                    fontSize: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>ADD USER</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  if (activeTab === 'payments') exportPaymentsToCSV();
+                  else if (activeTab === 'registrations') exportRegistrationsToCSV();
+                  else if (activeTab === 'users') exportUsersToCSV();
+                }}
+                className="btn-ghost"
+                style={{
+                  height: '40px',
+                  boxSizing: 'border-box',
+                  padding: '0 16px',
+                  fontSize: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Download size={14} />
+                <span style={{ whiteSpace: 'nowrap' }}>EXPORT CSV</span>
+              </button>
+            </div>
+          </div>
+
+          {/* =============================================================== */}
+          {/* TAB 1: Payments & Enrollments */}
+          {/* =============================================================== */}
+          {activeTab === 'payments' && (
+            <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '14px 18px' }}>Student / Contact</th>
+                      <th style={{ padding: '14px 18px' }}>Purchased Program</th>
+                      <th style={{ padding: '14px 18px' }}>Amount</th>
+                      <th style={{ padding: '14px 18px' }}>Status</th>
+                      <th style={{ padding: '14px 18px' }}>Transaction ID</th>
+                      <th style={{ padding: '14px 18px' }}>Date</th>
+                      <th style={{ padding: '14px 18px', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                          No payment records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPayments.map((p) => {
+                        const isSuccess = p.status === 'SUCCESS';
+                        const isPending = p.status === 'PENDING';
+                        const isConsultation =
+                          p.courseId === 'call-consultation' ||
+                          p.courseName?.toLowerCase().includes('consultation');
+
+                        return (
+                          <tr key={p.txnid} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            {/* Student */}
+                            <td style={{ padding: '16px 18px' }}>
+                              <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                                {p.studentName || 'Student'}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>{p.email}</div>
+                              <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.phone}</div>
+                            </td>
+
+                            {/* Program */}
+                            <td style={{ padding: '16px 18px' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '2px 6px',
+                                marginBottom: '4px',
+                                backgroundColor: isConsultation ? 'rgba(234, 179, 8, 0.12)' : 'rgba(15, 23, 42, 0.08)',
+                                color: isConsultation ? '#854d0e' : '#0f172a'
+                              }}>
+                                {isConsultation ? '1-ON-1 CALL' : 'COURSE ENROLLMENT'}
+                              </span>
+                              <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '13px', lineHeight: 1.4 }}>
+                                {p.courseName}
+                              </div>
+                            </td>
+
+                            {/* Amount */}
+                            <td style={{ padding: '16px 18px', fontWeight: 800, color: '#000000', whiteSpace: 'nowrap' }}>
+                              ₹{Number(p.amount).toLocaleString('en-IN')}
+                            </td>
+
+                            {/* Status */}
+                            <td style={{ padding: '16px 18px' }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                backgroundColor:
+                                  isSuccess
+                                    ? 'rgba(21, 128, 61, 0.08)'
+                                    : isPending
+                                    ? 'rgba(234, 179, 8, 0.12)'
+                                    : 'rgba(185, 28, 28, 0.08)',
+                                color:
+                                  isSuccess
+                                    ? '#15803d'
+                                    : isPending
+                                    ? '#854d0e'
+                                    : '#b91c1c'
+                              }}>
+                                {isSuccess && <CheckCircle2 size={11} />}
+                                {isPending && <Clock size={11} />}
+                                {p.status}
+                              </span>
+                            </td>
+
+                            {/* Transaction ID */}
+                            <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{p.txnid}</span>
+                                <button
+                                  onClick={() => handleCopy(p.txnid, p.txnid)}
+                                  title="Copy Txn ID"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#94a3b8' }}
+                                >
+                                  {copiedText === p.txnid ? <Check size={12} style={{ color: '#15803d' }} /> : <Copy size={12} />}
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Date */}
+                            <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+
+                            {/* Actions */}
+                            <td style={{ padding: '16px 18px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              <button
+                                onClick={() => setSelectedStudentDetails({ payment: p, registration: p.registration })}
+                                className="btn-ghost"
+                                style={{ padding: '6px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <Eye size={12} />
+                                <span>VIEW</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* =============================================================== */}
+          {/* TAB 2: Student KYC Details */}
+          {/* =============================================================== */}
+          {activeTab === 'registrations' && (
+            <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '14px 18px' }}>Student Name</th>
+                      <th style={{ padding: '14px 18px' }}>DOB / Gender</th>
+                      <th style={{ padding: '14px 18px' }}>Contact</th>
+                      <th style={{ padding: '14px 18px' }}>KYC Numbers</th>
+                      <th style={{ padding: '14px 18px' }}>Occupation</th>
+                      <th style={{ padding: '14px 18px' }}>Address</th>
+                      <th style={{ padding: '14px 18px' }}>Order Txn ID</th>
+                      <th style={{ padding: '14px 18px' }}>Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRegistrations.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                          No KYC registration records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRegistrations.map((r) => (
+                        <tr key={r.txnid} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0f172a' }}>
+                            {r.fullName}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px' }}>
+                            <div style={{ color: '#0f172a' }}>{r.dob}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{r.gender}</div>
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px' }}>
+                            <div style={{ color: '#0f172a', fontWeight: 500 }}>{r.email}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{r.phone}</div>
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px' }}>
+                            <div style={{ color: '#15803d', fontWeight: 600 }}>Aadhaar: {r.aadharCard}</div>
+                            <div style={{ color: '#854d0e', fontWeight: 600 }}>PAN: {r.pan}</div>
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px', color: '#334155' }}>
+                            {r.occupation || '—'}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', maxWidth: '240px' }}>
+                            {r.address}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#0f172a' }}>
+                            {r.txnid}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* =============================================================== */}
+          {/* TAB 3: Logged In Users */}
+          {/* =============================================================== */}
+          {activeTab === 'users' && (
+            <div className="clean-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{
+                padding: '18px 24px',
+                borderBottom: '1px solid #e2e8f0',
+                backgroundColor: '#f8fafc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div>
+                  <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    Registered & Logged In User Accounts
+                  </h2>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>
+                    All registered student accounts and authentication records in database.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '14px 18px' }}>User Name</th>
+                      <th style={{ padding: '14px 18px' }}>Mail ID</th>
+                      <th style={{ padding: '14px 18px' }}>Consultation Status</th>
+                      <th style={{ padding: '14px 18px' }}>Account ID</th>
+                      <th style={{ padding: '14px 18px' }}>Created On</th>
+                      <th style={{ padding: '14px 18px' }}>Last Active</th>
+                      <th style={{ padding: '14px 18px', textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                          No registered user accounts found. Click &quot;ADD USER&quot; above to create one.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredUsers.map((u) => (
+                        <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <td style={{ padding: '16px 18px', fontWeight: 700, color: '#0f172a' }}>
+                            {u.name || 'Student'}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', color: '#334155' }}>
+                            {u.email}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', whiteSpace: 'nowrap' }}>
+                            {u.hasPaidConsultation ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                backgroundColor: 'rgba(234, 179, 8, 0.12)',
+                                color: '#854d0e',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                whiteSpace: 'nowrap'
+                              }}>
+                                <Sparkles size={11} />
+                                <span>Paid (₹10,000 Credit Active)</span>
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                Standard Account
+                              </span>
+                            )}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
+                            {u.id}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button
+                              onClick={() => {
+                                setEditingUser({ id: u.id, name: u.name, email: u.email });
+                                setEditName(u.name || '');
+                                setEditPassword('');
+                                setEditUserError('');
+                                setEditUserSuccess(null);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: '#ffffff',
+                                color: '#0f172a',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '0px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                            >
+                              <Key size={12} style={{ color: '#b8871b' }} />
+                              <span>Edit Password</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* =================================================================== */}
+      {/* MODAL 1: ADD NEW USER (Direct from Admin + WhatsApp Share) */}
+      {/* =================================================================== */}
+      {isAddUserOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 80
+        }}>
+          <div className="clean-card" style={{
+            width: '100%',
+            maxWidth: '480px',
+            padding: '32px',
+            position: 'relative',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)'
+          }}>
+            <button
+              onClick={() => {
+                setIsAddUserOpen(false);
+                setCreatedUserSuccess(null);
+                setAddUserError('');
+              }}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                backgroundColor: '#f1f5f9',
+                border: 'none',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#64748b',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            {/* Header */}
+            <div style={{ marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                STUDENT ACCESS PROVISIONING
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginTop: '4px', marginBottom: '4px' }}>
+                {createdUserSuccess ? 'Account Created Successfully!' : 'Add New Student Account'}
+              </h2>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                {createdUserSuccess
+                  ? 'Share these login credentials directly with the student via WhatsApp.'
+                  : 'Create an account and password for the student. They will use this to sign in.'}
+              </p>
+            </div>
+
+            {/* View A: Success Box with WhatsApp Sharing */}
+            {createdUserSuccess ? (
+              <div>
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  padding: '18px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={14} />
+                    <span>CREDENTIALS READY TO SHARE</span>
+                  </div>
+
+                  <div style={{ fontSize: '13px', lineHeight: 1.8, color: '#0f172a', fontFamily: 'monospace', backgroundColor: '#ffffff', padding: '12px', border: '1px dashed #cbd5e1' }}>
+                    <div><strong>Name:</strong> {createdUserSuccess.name}</div>
+                    <div><strong>Email:</strong> {createdUserSuccess.email}</div>
+                    <div><strong>Password:</strong> {createdUserSuccess.password}</div>
+                    <div><strong>Portal:</strong> payments.musictutorship.in</div>
+                  </div>
+                </div>
+
+                {/* WhatsApp & Copy Action Buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <a
+                    href={whatsappShareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      backgroundColor: '#25D366',
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <MessageCircle size={16} />
+                    <span>Share Credentials via WhatsApp</span>
+                  </a>
+
+                  <button
+                    onClick={() => handleCopy(
+                      `Hello ${createdUserSuccess.name}!\nYour Music Tutorship Student Portal account has been created.\n\n🌐 Portal: https://payments.musictutorship.in\n📧 Email: ${createdUserSuccess.email}\n🔑 Password: ${createdUserSuccess.password}\n\nPlease log in to access your course materials and consultations.`,
+                      'creds'
+                    )}
+                    className="btn-ghost"
+                    style={{ width: '100%', padding: '11px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    {copiedText === 'creds' ? <Check size={14} style={{ color: '#15803d' }} /> : <Copy size={14} />}
+                    <span>{copiedText === 'creds' ? 'Copied to Clipboard!' : 'Copy Credentials Message'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCreatedUserSuccess(null);
+                      setNewUserName('');
+                      setNewUserEmail('');
+                      generateRandomPassword();
+                    }}
+                    className="btn-primary"
+                    style={{ width: '100%', padding: '11px', marginTop: '6px', fontSize: '13px' }}
+                  >
+                    + Add Another Student
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* View B: User Creation Form */
+              <form onSubmit={handleCreateUser}>
+                {addUserError && (
+                  <div style={{
+                    padding: '10px 14px',
+                    backgroundColor: 'rgba(185, 28, 28, 0.08)',
+                    color: '#b91c1c',
+                    fontSize: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: '1px solid #fecaca'
+                  }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    <span>{addUserError}</span>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label" htmlFor="new-user-name">
+                    <span>Student Full Name</span>
+                  </label>
+                  <input
+                    id="new-user-name"
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Rahul Sharma"
+                    value={newUserName}
+                    onChange={(e) => setNewUserName(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label" htmlFor="new-user-email">
+                    <span>Student Email Address *</span>
+                  </label>
+                  <input
+                    id="new-user-email"
+                    type="email"
+                    required
+                    className="form-input"
+                    placeholder="student@example.com"
+                    value={newUserEmail}
+                    onChange={(e) => setNewUserEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label" htmlFor="new-user-password" style={{ marginBottom: 0 }}>
+                      <span>Password *</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={generateRandomPassword}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '11px',
+                        color: '#b8871b',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      🎲 Generate Password
+                    </button>
+                  </div>
+                  <input
+                    id="new-user-password"
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="Set password (min 6 chars)"
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    style={{ marginTop: '6px', marginBottom: '20px' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isCreatingUser}
+                  className="btn-primary"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {isCreatingUser ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                  <span>{isCreatingUser ? 'Creating Account...' : 'Create Account & Prepare WhatsApp Message'}</span>
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
 
       {/* =================================================================== */}
-      {/* Student Details Inspection Modal (Clean Receipt Style) */}
+      {/* MODAL: EDIT STUDENT / CHANGE PASSWORD */}
+      {/* =================================================================== */}
+      {editingUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 80
+        }}>
+          <div className="clean-card" style={{
+            width: '100%',
+            maxWidth: '480px',
+            padding: '32px',
+            position: 'relative',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)'
+          }}>
+            <button
+              onClick={() => {
+                setEditingUser(null);
+                setEditUserSuccess(null);
+                setEditUserError('');
+              }}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                backgroundColor: '#f1f5f9',
+                border: 'none',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#64748b',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            {/* Header */}
+            <div style={{ marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                ACCOUNT CREDENTIALS MANAGEMENT
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginTop: '4px', marginBottom: '4px' }}>
+                {editUserSuccess ? 'Password Updated!' : 'Edit Student Credentials'}
+              </h2>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                {editUserSuccess
+                  ? 'Credentials have been safely updated in Neon PostgreSQL.'
+                  : `Update password and profile for ${editingUser.email}`}
+              </p>
+            </div>
+
+            {/* Success View */}
+            {editUserSuccess ? (
+              <div>
+                <div style={{
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  padding: '16px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={14} />
+                    <span>UPDATED CREDENTIALS SAVED IN DATABASE</span>
+                  </div>
+
+                  <div style={{ fontSize: '13px', lineHeight: 1.8, color: '#0f172a', fontFamily: 'monospace', backgroundColor: '#ffffff', padding: '12px', border: '1px dashed #86efac' }}>
+                    <div><strong>Name:</strong> {editUserSuccess.name}</div>
+                    <div><strong>Email:</strong> {editUserSuccess.email}</div>
+                    {editUserSuccess.password && (
+                      <div><strong>New Password:</strong> {editUserSuccess.password}</div>
+                    )}
+                    <div><strong>Portal:</strong> payments.musictutorship.in</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {editUserSuccess.password && (
+                    <a
+                      href={whatsappEditShareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        backgroundColor: '#25D366',
+                        color: '#ffffff',
+                        textDecoration: 'none',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <MessageCircle size={16} />
+                      <span>Share New Password via WhatsApp</span>
+                    </a>
+                  )}
+
+                  {editUserSuccess.password && (
+                    <button
+                      onClick={() => handleCopy(
+                        `Hello ${editUserSuccess.name}!\nYour Music Tutorship Student Portal credentials have been updated.\n\n🌐 Portal: https://payments.musictutorship.in\n📧 Email: ${editUserSuccess.email}\n🔑 New Password: ${editUserSuccess.password}\n\nPlease log in using your updated password.`,
+                        'edit-creds'
+                      )}
+                      className="btn-ghost"
+                      style={{ width: '100%', padding: '11px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      {copiedText === 'edit-creds' ? <Check size={14} style={{ color: '#15803d' }} /> : <Copy size={14} />}
+                      <span>{copiedText === 'edit-creds' ? 'Copied to Clipboard!' : 'Copy Updated Credentials'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setEditingUser(null);
+                      setEditUserSuccess(null);
+                    }}
+                    className="btn-primary"
+                    style={{ width: '100%', padding: '11px', marginTop: '6px', fontSize: '13px' }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Edit Form */
+              <form onSubmit={handleUpdateUser}>
+                {editUserError && (
+                  <div style={{
+                    padding: '10px 14px',
+                    backgroundColor: 'rgba(185, 28, 28, 0.08)',
+                    color: '#b91c1c',
+                    fontSize: '12px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: '1px solid #fecaca'
+                  }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    <span>{editUserError}</span>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label">
+                    <span>Student Email (Registered)</span>
+                  </label>
+                  <input
+                    type="email"
+                    disabled
+                    className="form-input"
+                    value={editingUser.email}
+                    style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label" htmlFor="edit-user-name">
+                    <span>Student Name</span>
+                  </label>
+                  <input
+                    id="edit-user-name"
+                    type="text"
+                    className="form-input"
+                    placeholder="Student Name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label" htmlFor="edit-user-password" style={{ marginBottom: 0 }}>
+                      <span>New Password </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={generateEditRandomPassword}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '11px',
+                        color: '#b8871b',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      🎲 Generate Password
+                    </button>
+                  </div>
+                  <input
+                    id="edit-user-password"
+                    type="text"
+                    className="form-input"
+                    placeholder="Enter new password (min 6 chars)"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    style={{ marginTop: '6px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="btn-ghost"
+                    style={{ flex: 1, padding: '12px', fontSize: '13px' }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isUpdatingUser}
+                    className="btn-primary"
+                    style={{
+                      flex: 2,
+                      padding: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {isUpdatingUser ? <Loader2 className="animate-spin" size={16} /> : <Key size={16} />}
+                    <span>{isUpdatingUser ? 'Saving Changes...' : 'Save Updated Password'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL 2: STUDENT DETAILS INSPECTION MODAL */}
       {/* =================================================================== */}
       {selectedStudentDetails && (
         <div style={{
@@ -1345,9 +1955,9 @@ export default function AdminPage() {
 
             {/* Modal Header */}
             <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
-              <span className="section-overline">
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#b8871b', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
                 STUDENT ENROLLMENT RECORD
-              </span>
+              </div>
               <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginTop: '6px' }}>
                 {selectedStudentDetails.registration?.fullName || selectedStudentDetails.payment.studentName || 'Student Details'}
               </h2>
@@ -1399,143 +2009,86 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
-                <div>
-                  <span style={{ color: '#64748b' }}>Transaction Date:</span>
-                  <div style={{ color: '#0f172a', marginTop: '2px' }}>
-                    {selectedStudentDetails.payment.createdAt ? new Date(selectedStudentDetails.payment.createdAt).toLocaleString('en-IN') : '—'}
+                {selectedStudentDetails.payment.bankRefNum && (
+                  <div>
+                    <span style={{ color: '#64748b' }}>Bank Ref:</span>
+                    <div style={{ color: '#0f172a', marginTop: '2px', fontFamily: 'monospace' }}>
+                      {selectedStudentDetails.payment.bankRefNum}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Post-Payment KYC Details Section */}
+            {/* KYC Profile Details */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                  Post-Payment Details (Entered by Student)
-                </div>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: selectedStudentDetails.registration ? '#15803d' : '#854d0e'
-                }}>
-                  {selectedStudentDetails.registration ? '✓ Submitted' : '⚠ KYC Form Not Yet Submitted'}
-                </span>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '12px' }}>
+                Mandatory 9-Point Student KYC Details
               </div>
 
               {selectedStudentDetails.registration ? (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '14px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  padding: '16px'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>1. Full Name</div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                      {selectedStudentDetails.registration.fullName}
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', fontSize: '13px' }}>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>1. Full Name</div>
+                    <div style={{ fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{selectedStudentDetails.registration.fullName}</div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>2. Date of Birth</div>
-                    <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px' }}>
-                      {selectedStudentDetails.registration.dob}
-                    </div>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>2. Date of Birth</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedStudentDetails.registration.dob}</div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>3. Gender</div>
-                    <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px' }}>
-                      {selectedStudentDetails.registration.gender}
-                    </div>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>3. Gender</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedStudentDetails.registration.gender}</div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>4. Mail ID</div>
-                    <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px', wordBreak: 'break-all' }}>
-                      {selectedStudentDetails.registration.email}
-                    </div>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>4. Email Address</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedStudentDetails.registration.email}</div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>5. Phone Number</div>
-                    <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px' }}>
-                      {selectedStudentDetails.registration.phone}
-                    </div>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>5. Phone Number</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedStudentDetails.registration.phone}</div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>6. Aadhaar Card Number</div>
-                    <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#15803d', fontWeight: 700, marginTop: '2px' }}>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>6. Aadhaar Card</div>
+                    <div style={{ fontWeight: 700, color: '#15803d', fontFamily: 'monospace', marginTop: '2px' }}>
                       {selectedStudentDetails.registration.aadharCard}
                     </div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>7. PAN Number</div>
-                    <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#854d0e', fontWeight: 700, marginTop: '2px' }}>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>7. PAN Card</div>
+                    <div style={{ fontWeight: 700, color: '#854d0e', fontFamily: 'monospace', marginTop: '2px' }}>
                       {selectedStudentDetails.registration.pan}
                     </div>
                   </div>
 
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>8. Occupation</div>
-                    <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px' }}>
-                      {selectedStudentDetails.registration.occupation}
-                    </div>
+                  <div style={{ padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>8. Occupation</div>
+                    <div style={{ fontWeight: 600, color: '#0f172a', marginTop: '2px' }}>{selectedStudentDetails.registration.occupation}</div>
                   </div>
 
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>9. Residential Address</div>
-                    <div style={{ fontSize: '13px', color: '#334155', marginTop: '2px', lineHeight: 1.5 }}>
-                      {selectedStudentDetails.registration.address}
-                    </div>
-                  </div>
-
-                  <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '11px', color: '#64748b' }}>
-                    Form Submitted On: {selectedStudentDetails.registration.submittedAt ? new Date(selectedStudentDetails.registration.submittedAt).toLocaleString('en-IN') : '—'}
+                  <div style={{ gridColumn: '1 / -1', padding: '10px 12px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>9. Residential Address</div>
+                    <div style={{ color: '#0f172a', marginTop: '2px', lineHeight: 1.5 }}>{selectedStudentDetails.registration.address}</div>
                   </div>
                 </div>
               ) : (
                 <div style={{
                   padding: '24px',
                   textAlign: 'center',
-                  backgroundColor: '#f8fafc',
-                  border: '1px dashed #cbd5e1',
-                  color: '#64748b',
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fef3c7',
+                  color: '#92400e',
                   fontSize: '13px'
                 }}>
-                  {selectedStudentDetails.payment.courseId === 'call-consultation' ||
-                  selectedStudentDetails.payment.courseName?.toLowerCase().includes('consultation') ? (
-                    <div>
-                      This was a 1-on-1 Consultation booking. Consultations do not require the 9-field student KYC registration.
-                    </div>
-                  ) : (
-                    <div>
-                      The student has not completed the post-payment KYC registration form yet. The registration link is:
-                      <div style={{ marginTop: '8px' }}>
-                        <code style={{ color: '#0f172a', fontSize: '12px' }}>
-                          /register?txnid={selectedStudentDetails.payment.txnid}
-                        </code>
-                      </div>
-                    </div>
-                  )}
+                  Student has not submitted their post-payment 9-point KYC registration yet.
                 </div>
               )}
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button
-                onClick={() => setSelectedStudentDetails(null)}
-                className="btn-primary"
-                style={{ width: 'auto', padding: '10px 20px', fontSize: '12px' }}
-              >
-                CLOSE
-              </button>
             </div>
           </div>
         </div>

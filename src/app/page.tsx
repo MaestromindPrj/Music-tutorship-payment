@@ -433,18 +433,6 @@ function HomeContent() {
                           {isCallConsultation && hasPaidConsultation ? 'ALREADY BOOKED' : course.badge}
                         </div>
                       )}
-                      {hasCredit && (
-                        <div style={{
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          backgroundColor: 'rgba(21, 128, 61, 0.12)',
-                          color: '#15803d',
-                          letterSpacing: '0.4px'
-                        }}>
-                          ₹10,000 CREDIT APPLIED
-                        </div>
-                      )}
                     </div>
 
                     <div style={{
@@ -605,7 +593,6 @@ function HomeContent() {
                         fontStyle: 'italic',
                         marginTop: '8px'
                       }}>
-                        *18% GST will be calculated & shown in right-side Enrollment Summary.
                       </div>
                     </div>
                   </div>
@@ -625,58 +612,6 @@ function HomeContent() {
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                   {selectedCourse.title}
                 </p>
-              </div>
-
-              {/* Login Status Indicator / Prompt */}
-              <div style={{
-                marginBottom: '16px',
-                padding: '10px 14px',
-                backgroundColor: currentUser ? '#f0fdf4' : '#fffbeb',
-                border: currentUser ? '1px solid #bbf7d0' : '1px solid #fde68a',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {currentUser ? (
-                    <>
-                      <CheckCircle2 size={16} style={{ color: '#15803d', flexShrink: 0 }} />
-                      <span style={{ color: '#166534' }}>
-                        Logged in as: <strong>{currentUser.email}</strong>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <User size={16} style={{ color: '#b45309', flexShrink: 0 }} />
-                      <span style={{ color: '#92400e' }}>
-                        <strong>Email Login is required</strong> to complete checkout.
-                      </span>
-                    </>
-                  )}
-                </div>
-                {!currentUser && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthActionPrompt('Please log in with your email and password to proceed.');
-                      setIsAuthModalOpen(true);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#0f172a',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      fontSize: '12px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Log In Now
-                  </button>
-                )}
               </div>
 
               {formError && (
