@@ -138,7 +138,7 @@ export default function Header() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="header-calendly-btn"
-                        title="Book or reschedule your Discovery Call slot on Calendly"
+                        title="Book your Discovery Call slot on Calendly"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -154,7 +154,7 @@ export default function Header() {
                         }}
                       >
                         <Calendar size={13} />
-                        <span className="btn-text-full">Book Discovery Call</span>
+                        <span className="btn-text-full">Book Calendly Slot</span>
                         <span className="btn-text-mobile">Book Slot</span>
                       </a>
                     )}

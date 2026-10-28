@@ -319,7 +319,7 @@ function HomeContent() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={16} style={{ color: '#b8871b', flexShrink: 0 }} />
             <span>
-              <strong>Discovery Call Paid:</strong> Ready to choose your 1-on-1 strategy session slot?
+              <strong>Discovery Call Paid:</strong> Please book your slot in Calendly to complete scheduling.
             </span>
           </div>
 
@@ -341,7 +341,7 @@ function HomeContent() {
             }}
           >
             <Calendar size={13} />
-            <span>Book / Reschedule Slot on Calendly</span>
+            <span>Book Slot on Calendly</span>
             <ExternalLink size={12} />
           </a>
 
@@ -662,10 +662,10 @@ function HomeContent() {
                             <CheckCircle2 size={16} style={{ color: '#15803d', flexShrink: 0 }} />
                             <div>
                               <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>
-                                Discovery Call Confirmed
+                                Discovery Call Paid
                               </div>
                               <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                Book or change your session time anytime
+                                Please book your slot in Calendly
                               </div>
                             </div>
                           </div>
@@ -689,7 +689,7 @@ function HomeContent() {
                             }}
                           >
                             <Calendar size={13} />
-                            <span>Book Calendly Slot</span>
+                            <span>Book Slot on Calendly</span>
                             <ExternalLink size={12} />
                           </a>
                         </div>
