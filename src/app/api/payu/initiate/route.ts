@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const txnid = generateTxnId();
     const courseName = course ? course.title : 'Music Production Course Fee';
 
-    // Save initial transaction record to Google Sheets & memory cache
+    // Save initial transaction record to database & memory cache
     await savePayment({
       txnid,
       amount: totalAmount,

@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       await markConsultationPaid(email);
     }
 
-    // Update Google Sheets & cache with verified transaction status
+    // Update database & cache with verified transaction status
     await updatePaymentStatus(
       txnid,
       isSuccess ? 'SUCCESS' : 'FAILED',
