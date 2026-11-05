@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
         id: result.user.id,
         email: result.user.email,
         name: result.user.name,
-        hasPaidConsultation: result.user.hasPaidConsultation
+        hasPaidConsultation: result.user.hasPaidConsultation,
+        allowedCourses: result.user.allowedCourses || []
       }
     });
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 30 * 24 * 60 * 60 // 30 days
+      maxAge: 30 * 24 * 60 * 60
     });
 
     return response;

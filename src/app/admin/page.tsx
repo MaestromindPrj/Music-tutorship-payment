@@ -30,10 +30,12 @@ import {
   Send,
   Key,
   Share2,
-  MessageCircle
+  MessageCircle,
+  Award,
+  Edit2,
+  Trash2
 } from 'lucide-react';
-import { PaymentRecord, StudentRegistration } from '@/types';
-import { getPricing } from '@/lib/pricing';
+import { PaymentRecord, StudentRegistration, Course } from '@/types';
 
 interface PaymentWithReg extends PaymentRecord {
   registration?: StudentRegistration | null;
@@ -44,6 +46,7 @@ interface UserRecord {
   email: string;
   name: string;
   hasPaidConsultation: boolean;
+  allowedCourses?: string[];
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -81,7 +84,8 @@ export default function AdminPage() {
   const [registrations, setRegistrations] = useState<StudentRegistration[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
 
-  const [activeTab, setActiveTab] = useState<'payments' | 'registrations' | 'users'>('payments');
+  const [activeTab, setActiveTab] = useState<'payments' | 'registrations' | 'users' | 'courses'>('payments');
+  const [coursesList, setCoursesList] = useState<Course[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'PENDING' | 'FAILED'>('ALL');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'COURSE' | 'CONSULTATION'>('ALL');
@@ -92,11 +96,33 @@ export default function AdminPage() {
   } | null>(null);
 
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [justRefreshed, setJustRefreshed] = useState(false);
 
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserAllowedCourses, setNewUserAllowedCourses] = useState<string[]>([]);
+  const [editAllowedCourses, setEditAllowedCourses] = useState<string[]>([]);
+
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [courseFormTitle, setCourseFormTitle] = useState('');
+  const [courseFormSubtitle, setCourseFormSubtitle] = useState('');
+  const [courseFormTag, setCourseFormTag] = useState('');
+  const [courseFormBadge, setCourseFormBadge] = useState('');
+  const [courseFormPrice, setCourseFormPrice] = useState<number | string>('');
+  const [courseFormOriginalPrice, setCourseFormOriginalPrice] = useState<number | string>('');
+  const [courseFormDuration, setCourseFormDuration] = useState('');
+  const [courseFormBatchSize, setCourseFormBatchSize] = useState('');
+  const [courseFormType, setCourseFormType] = useState<'course' | 'consultation'>('course');
+  const [courseFormTaxRate, setCourseFormTaxRate] = useState<number>(0.18);
+  const [courseFormFeatures, setCourseFormFeatures] = useState('');
+  const [courseFormPopular, setCourseFormPopular] = useState(false);
+  const [courseFormDisabled, setCourseFormDisabled] = useState(false);
+  const [isSavingCourse, setIsSavingCourse] = useState(false);
+  const [courseFormError, setCourseFormError] = useState('');
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [addUserError, setAddUserError] = useState('');
   const [createdUserSuccess, setCreatedUserSuccess] = useState<{
@@ -192,6 +218,7 @@ export default function AdminPage() {
         if (data.payments) setPayments(data.payments);
         if (data.registrations) setRegistrations(data.registrations);
         if (data.users) setUsers(data.users);
+        if (data.courses) setCoursesList(data.courses);
       }
     } catch (e) {
       console.error('Error fetching admin data:', e);
@@ -199,6 +226,18 @@ export default function AdminPage() {
       setIsLoadingData(false);
     }
   };
+
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    setJustRefreshed(false);
+    await fetchDashboardData();
+    setIsManualRefreshing(false);
+    setJustRefreshed(true);
+    setTimeout(() => {
+      setJustRefreshed(false);
+    }, 1800);
+  };
+
 
   const generateRandomPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -208,6 +247,53 @@ export default function AdminPage() {
     }
     pwd += '!';
     setNewUserPassword(pwd);
+  };
+
+  const handleSaveCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCourseFormError('');
+    if (!courseFormTitle.trim() || !courseFormTag.trim() || courseFormPrice === '') {
+      setCourseFormError('Please fill in required fields: Title, Tag, and Price.');
+      return;
+    }
+
+    setIsSavingCourse(true);
+    try {
+      const payload = {
+        id: editingCourse ? editingCourse.id : undefined,
+        title: courseFormTitle.trim(),
+        subtitle: courseFormSubtitle.trim() || undefined,
+        tag: courseFormTag.trim(),
+        badge: courseFormBadge.trim() || undefined,
+        price: Number(courseFormPrice),
+        originalPrice: courseFormOriginalPrice ? Number(courseFormOriginalPrice) : undefined,
+        duration: courseFormDuration.trim() || 'Custom Duration',
+        batchSize: courseFormBatchSize.trim() || 'Standard Batch',
+        featuresStr: courseFormFeatures,
+        type: courseFormType,
+        taxRate: Number(courseFormTaxRate),
+        popular: courseFormPopular,
+        disabled: courseFormDisabled
+      };
+
+      const res = await fetch('/api/admin/courses', {
+        method: editingCourse ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setIsSavingCourse(false);
+
+      if (data.success) {
+        setIsCourseModalOpen(false);
+        fetchDashboardData();
+      } else {
+        setCourseFormError(data.error || 'Failed to save program.');
+      }
+    } catch (err: any) {
+      setIsSavingCourse(false);
+      setCourseFormError(err?.message || 'Connection error.');
+    }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -232,7 +318,8 @@ export default function AdminPage() {
           name: newUserName.trim() || newUserEmail.split('@')[0],
           email: newUserEmail.trim().toLowerCase(),
           password: newUserPassword,
-          hasPaidConsultation: false
+          hasPaidConsultation: false,
+          allowedCourses: newUserAllowedCourses
         })
       });
       const data = await res.json();
@@ -282,7 +369,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           email: editingUser.email,
           password: editPassword || undefined,
-          name: editName.trim() || undefined
+          name: editName.trim() || undefined,
+          allowedCourses: editAllowedCourses
         })
       });
       const data = await res.json();
@@ -664,19 +752,37 @@ export default function AdminPage() {
 
         <div className="admin-top-controls" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <button
-            onClick={fetchDashboardData}
-            disabled={isLoadingData}
+            onClick={handleManualRefresh}
+            disabled={isManualRefreshing}
             className="btn-ghost"
             style={{
               padding: '8px 14px',
               fontSize: '12px',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '6px',
+              color: justRefreshed ? '#15803d' : '#0f172a',
+              borderColor: justRefreshed ? '#86efac' : undefined,
+              backgroundColor: justRefreshed ? 'rgba(21, 128, 61, 0.08)' : undefined,
+              transition: 'all 0.2s ease'
             }}
           >
-            <RefreshCw size={13} style={{ animation: isLoadingData ? 'spin 1s linear infinite' : 'none' }} />
-            <span>REFRESH</span>
+            {justRefreshed ? (
+              <>
+                <Check size={13} style={{ color: '#15803d' }} />
+                <span style={{ fontWeight: 700 }}>REFRESHED</span>
+              </>
+            ) : isManualRefreshing ? (
+              <>
+                <RefreshCw size={13} style={{ animation: 'spin 0.8s linear infinite' }} />
+                <span>REFRESHING...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw size={13} style={{ animation: isLoadingData ? 'spin 1s linear infinite' : 'none' }} />
+                <span>REFRESH</span>
+              </>
+            )}
           </button>
 
           <div style={{
@@ -804,6 +910,39 @@ export default function AdminPage() {
               </button>
 
               <button
+                onClick={() => setActiveTab('courses')}
+                className={`admin-tab-btn ${activeTab === 'courses' ? 'active' : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: activeTab === 'courses' ? '#0f172a' : 'transparent',
+                  color: activeTab === 'courses' ? '#ffffff' : '#334155',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Award size={16} />
+                  <span>Programs & Options</span>
+                </div>
+                <span className="tab-badge" style={{
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  backgroundColor: activeTab === 'courses' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                  color: activeTab === 'courses' ? '#ffffff' : '#475569'
+                }}>
+                  {coursesList.length}
+                </span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('users')}
                 className={`admin-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
                 style={{
@@ -845,6 +984,7 @@ export default function AdminPage() {
                   setAddUserError('');
                   setNewUserName('');
                   setNewUserEmail('');
+                  setNewUserAllowedCourses(coursesList.filter(c => !c.disabled).map(c => c.id));
                   generateRandomPassword();
                 }}
                 className="btn-primary"
@@ -1042,10 +1182,10 @@ export default function AdminPage() {
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       <th style={{ padding: '14px 18px' }}>Student / Contact</th>
-                      <th style={{ padding: '14px 18px' }}>Purchased Program</th>
+                      <th style={{ padding: '14px 18px', minWidth: '280px' }}>Purchased Program</th>
                       <th style={{ padding: '14px 18px' }}>Amount</th>
                       <th style={{ padding: '14px 18px' }}>Status</th>
-                      <th style={{ padding: '14px 18px' }}>Transaction ID</th>
+                      <th style={{ padding: '14px 18px', minWidth: '220px', whiteSpace: 'nowrap' }}>Transaction ID</th>
                       <th style={{ padding: '14px 18px' }}>Date</th>
                       <th style={{ padding: '14px 18px', textAlign: 'right' }}>Actions</th>
                     </tr>
@@ -1053,7 +1193,7 @@ export default function AdminPage() {
                   <tbody>
                     {filteredPayments.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                        <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                           No payment records found.
                         </td>
                       </tr>
@@ -1075,7 +1215,7 @@ export default function AdminPage() {
                               <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.phone}</div>
                             </td>
 
-                            <td style={{ padding: '16px 18px' }}>
+                            <td style={{ padding: '16px 18px', minWidth: '280px' }}>
                               <span style={{
                                 display: 'inline-block',
                                 fontSize: '10px',
@@ -1123,7 +1263,7 @@ export default function AdminPage() {
                               </span>
                             </td>
 
-                            <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
+                            <td style={{ padding: '16px 18px', minWidth: '220px', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span>{p.txnid}</span>
                                 <button
@@ -1168,12 +1308,12 @@ export default function AdminPage() {
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       <th style={{ padding: '14px 18px' }}>Student Name</th>
-                      <th style={{ padding: '14px 18px' }}>DOB / Gender</th>
+                      <th style={{ padding: '14px 18px', minWidth: '140px', whiteSpace: 'nowrap' }}>DOB / Gender</th>
                       <th style={{ padding: '14px 18px' }}>Contact</th>
-                      <th style={{ padding: '14px 18px' }}>KYC Numbers</th>
+                      <th style={{ padding: '14px 18px', minWidth: '220px', whiteSpace: 'nowrap' }}>KYC Numbers</th>
                       <th style={{ padding: '14px 18px' }}>Occupation</th>
-                      <th style={{ padding: '14px 18px' }}>Address</th>
-                      <th style={{ padding: '14px 18px' }}>Order Txn ID</th>
+                      <th style={{ padding: '14px 18px', minWidth: '320px' }}>Address</th>
+                      <th style={{ padding: '14px 18px', minWidth: '220px', whiteSpace: 'nowrap' }}>Order Txn ID</th>
                       <th style={{ padding: '14px 18px' }}>Submitted</th>
                     </tr>
                   </thead>
@@ -1191,7 +1331,7 @@ export default function AdminPage() {
                             {r.fullName}
                           </td>
 
-                          <td style={{ padding: '16px 18px', fontSize: '12px' }}>
+                          <td style={{ padding: '16px 18px', minWidth: '140px', whiteSpace: 'nowrap', fontSize: '12px' }}>
                             <div style={{ color: '#0f172a' }}>{r.dob}</div>
                             <div style={{ fontSize: '11px', color: '#64748b' }}>{r.gender}</div>
                           </td>
@@ -1201,7 +1341,7 @@ export default function AdminPage() {
                             <div style={{ fontSize: '11px', color: '#64748b' }}>{r.phone}</div>
                           </td>
 
-                          <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px' }}>
+                          <td style={{ padding: '16px 18px', minWidth: '220px', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '11px' }}>
                             <div style={{ color: '#15803d', fontWeight: 600 }}>Aadhaar: {r.aadharCard}</div>
                             <div style={{ color: '#854d0e', fontWeight: 600 }}>PAN: {r.pan}</div>
                           </td>
@@ -1210,11 +1350,11 @@ export default function AdminPage() {
                             {r.occupation || '—'}
                           </td>
 
-                          <td style={{ padding: '16px 18px', fontSize: '12px', color: '#64748b', maxWidth: '240px' }}>
+                          <td style={{ padding: '16px 18px', minWidth: '320px', fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
                             {r.address}
                           </td>
 
-                          <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#0f172a' }}>
+                          <td style={{ padding: '16px 18px', minWidth: '220px', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '11px', color: '#0f172a' }}>
                             {r.txnid}
                           </td>
 
@@ -1260,6 +1400,7 @@ export default function AdminPage() {
                       <th style={{ padding: '14px 18px' }}>User Name</th>
                       <th style={{ padding: '14px 18px' }}>Mail ID</th>
                       <th style={{ padding: '14px 18px' }}>Consultation Status</th>
+                      <th style={{ padding: '14px 18px', minWidth: '200px' }}>Permitted Programs</th>
                       <th style={{ padding: '14px 18px' }}>Account ID</th>
                       <th style={{ padding: '14px 18px' }}>Created On</th>
                       <th style={{ padding: '14px 18px' }}>Last Active</th>
@@ -1298,13 +1439,41 @@ export default function AdminPage() {
                                 whiteSpace: 'nowrap'
                               }}>
                                 <Sparkles size={11} />
-                                <span>Paid ({getPricing().creditText} Credit Active)</span>
+                                <span>Paid (Credit Active)</span>
                               </span>
                             ) : (
                               <span style={{ fontSize: '11px', color: '#64748b' }}>
                                 Standard Account
                               </span>
                             )}
+                          </td>
+
+                          <td style={{ padding: '16px 18px', minWidth: '200px' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', maxWidth: '240px' }}>
+                              {Array.isArray(u.allowedCourses) && u.allowedCourses.length > 0 ? (
+                                u.allowedCourses.map((cId) => {
+                                  const found = coursesList.find((c) => c.id === cId);
+                                  return (
+                                    <span
+                                      key={cId}
+                                      style={{
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        padding: '2px 6px',
+                                        backgroundColor: 'rgba(226, 177, 60, 0.15)',
+                                        color: '#b8871b',
+                                        border: '1px solid rgba(226, 177, 60, 0.3)',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      {found ? found.title : cId}
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>All Public Options</span>
+                              )}
+                            </div>
                           </td>
 
                           <td style={{ padding: '16px 18px', fontFamily: 'monospace', fontSize: '11px', color: '#64748b' }}>
@@ -1325,6 +1494,7 @@ export default function AdminPage() {
                                 setEditingUser({ id: u.id, name: u.name, email: u.email });
                                 setEditName(u.name || '');
                                 setEditPassword('');
+                                setEditAllowedCourses(Array.isArray(u.allowedCourses) && u.allowedCourses.length > 0 ? u.allowedCourses : coursesList.map(c => c.id));
                                 setEditUserError('');
                                 setEditUserSuccess(null);
                               }}
@@ -1343,7 +1513,7 @@ export default function AdminPage() {
                               }}
                             >
                               <Key size={12} style={{ color: '#b8871b' }} />
-                              <span>Edit Password</span>
+                              <span>Edit Access & Pass</span>
                             </button>
                           </td>
                         </tr>
@@ -1351,6 +1521,183 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'courses' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Live Programs & Consultation Options</h2>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0 0' }}>Manage courses and discovery call options displayed dynamically on user-facing portal.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingCourse(null);
+                    setCourseFormTitle('');
+                    setCourseFormSubtitle('');
+                    setCourseFormTag('INTENSIVE PROGRAM');
+                    setCourseFormBadge('ENROLLING NOW');
+                    setCourseFormPrice('');
+                    setCourseFormOriginalPrice('');
+                    setCourseFormDuration('4 Months');
+                    setCourseFormBatchSize('13 Students per Batch');
+                    setCourseFormType('course');
+                    setCourseFormTaxRate(0.18);
+                    setCourseFormFeatures('');
+                    setCourseFormPopular(false);
+                    setCourseFormDisabled(false);
+                    setCourseFormError('');
+                    setIsCourseModalOpen(true);
+                  }}
+                  className="btn-primary"
+                  style={{
+                    height: '40px',
+                    boxSizing: 'border-box',
+                    padding: '0 16px',
+                    fontSize: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>ADD OPTION</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                {coursesList.map((c) => (
+                  <div
+                    key={c.id}
+                    className="clean-card"
+                    style={{
+                      padding: '20px',
+                      backgroundColor: c.disabled ? '#f8fafc' : '#ffffff',
+                      border: c.disabled ? '1px dashed #cbd5e1' : '1px solid #e2e8f0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#b8871b' }}>{c.tag ? c.tag.replace(/^\d+\s*\/\s*/, '') : ''}</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {c.badge && (
+                            <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', backgroundColor: 'rgba(226, 177, 60, 0.15)', color: '#b8871b' }}>
+                              {c.badge}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', backgroundColor: c.disabled ? '#fee2e2' : '#dcfce7', color: c.disabled ? '#991b1b' : '#166534' }}>
+                            {c.disabled ? 'Disabled' : 'Live'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>{c.title}</h3>
+                      {c.subtitle && <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>{c.subtitle}</p>}
+                      <p style={{ fontSize: '11px', color: '#475569', marginBottom: '12px' }}>
+                        {c.duration} • {c.batchSize} • {c.type === 'consultation' ? 'Calendly Flow' : 'KYC Flow'}
+                      </p>
+
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '14px' }}>
+                        ₹{Number(c.price).toLocaleString('en-IN')}
+                        {c.originalPrice && (
+                          <span style={{ fontSize: '12px', color: '#94a3b8', textDecoration: 'line-through', marginLeft: '6px' }}>
+                            ₹{Number(c.originalPrice).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748b', marginLeft: '6px' }}>
+                          ({c.taxRate ? `${Math.round(Number(c.taxRate) * 100)}% GST` : '0% Tax'})
+                        </span>
+                      </div>
+
+                      <ul style={{ margin: '0 0 16px 0', paddingLeft: '16px', fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                        {c.features.slice(0, 3).map((f, i) => (
+                          <li key={i}>{f}</li>
+                        ))}
+                        {c.features.length > 3 && <li>+{c.features.length - 3} more features</li>}
+                      </ul>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid #f1f5f9' }}>
+                      <button
+                        onClick={() => {
+                          setEditingCourse(c);
+                          setCourseFormTitle(c.title);
+                          setCourseFormSubtitle(c.subtitle || '');
+                          setCourseFormTag(c.tag);
+                          setCourseFormBadge(c.badge || '');
+                          setCourseFormPrice(c.price);
+                          setCourseFormOriginalPrice(c.originalPrice || '');
+                          setCourseFormDuration(c.duration);
+                          setCourseFormBatchSize(c.batchSize);
+                          setCourseFormType((c.type as any) || 'course');
+                          setCourseFormTaxRate(c.taxRate !== undefined ? c.taxRate : 0.18);
+                          setCourseFormFeatures(Array.isArray(c.features) ? c.features.join('\n') : '');
+                          setCourseFormPopular(Boolean(c.popular));
+                          setCourseFormDisabled(Boolean(c.disabled));
+                          setCourseFormError('');
+                          setIsCourseModalOpen(true);
+                        }}
+                        style={{
+                          flex: 1,
+                          height: '40px',
+                          boxSizing: 'border-box',
+                          padding: '0 16px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          color: '#0f172a',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <Edit2 size={13} />
+                        <span>EDIT</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to delete "${c.title}"?`)) {
+                            try {
+                              await fetch(`/api/admin/courses?id=${encodeURIComponent(c.id)}`, { method: 'DELETE' });
+                              fetchDashboardData();
+                            } catch (e) {
+                              alert('Failed to delete course');
+                            }
+                          }
+                        }}
+                        style={{
+                          height: '40px',
+                          boxSizing: 'border-box',
+                          padding: '0 16px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          backgroundColor: 'rgba(185, 28, 28, 0.08)',
+                          border: '1px solid #fecaca',
+                          color: '#b91c1c',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <Trash2 size={13} />
+                        <span>DELETE</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1564,8 +1911,36 @@ export default function AdminPage() {
                     placeholder="Set password (min 6 chars)"
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
-                    style={{ marginTop: '6px', marginBottom: '20px' }}
+                    style={{ marginTop: '6px', marginBottom: '14px' }}
                   />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label" style={{ marginBottom: '8px' }}>
+                    <span>Visible Options for this Student (Check to Show) *</span>
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', maxHeight: '160px', overflowY: 'auto' }}>
+                    {coursesList.map((c) => (
+                      <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                        <input
+                          type="checkbox"
+                          checked={newUserAllowedCourses.includes(c.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewUserAllowedCourses([...newUserAllowedCourses, c.id]);
+                            } else {
+                              setNewUserAllowedCourses(newUserAllowedCourses.filter((id) => id !== c.id));
+                            }
+                          }}
+                          style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
+                        />
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{c.title}</span>
+                      </label>
+                    ))}
+                    {coursesList.length === 0 && (
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>No options available</span>
+                    )}
+                  </div>
                 </div>
 
                 <button
@@ -1641,7 +2016,7 @@ export default function AdminPage() {
                 ACCOUNT CREDENTIALS MANAGEMENT
               </div>
               <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginTop: '4px', marginBottom: '4px' }}>
-                {editUserSuccess ? 'Password Updated!' : 'Edit Student Credentials'}
+                {editUserSuccess ? 'Access & Password Updated!' : 'Edit Student Access & Credentials'}
               </h2>
               <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
                 {editUserSuccess
@@ -1802,6 +2177,34 @@ export default function AdminPage() {
                   />
                 </div>
 
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label" style={{ marginBottom: '8px' }}>
+                    <span>Visible Options for this Student (Check to Show)</span>
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px 12px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', maxHeight: '160px', overflowY: 'auto' }}>
+                    {coursesList.map((c) => (
+                      <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                        <input
+                          type="checkbox"
+                          checked={editAllowedCourses.includes(c.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditAllowedCourses([...editAllowedCourses, c.id]);
+                            } else {
+                              setEditAllowedCourses(editAllowedCourses.filter((id) => id !== c.id));
+                            }
+                          }}
+                          style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
+                        />
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{c.title}</span>
+                      </label>
+                    ))}
+                    {coursesList.length === 0 && (
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>No options available</span>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     type="button"
@@ -1826,11 +2229,240 @@ export default function AdminPage() {
                     }}
                   >
                     {isUpdatingUser ? <Loader2 className="animate-spin" size={16} /> : <Key size={16} />}
-                    <span>{isUpdatingUser ? 'Saving Changes...' : 'Save Updated Password'}</span>
+                    <span>{isUpdatingUser ? 'Saving Changes...' : 'Save Changes'}</span>
                   </button>
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {isCourseModalOpen && (
+        <div className="admin-modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 90
+        }}>
+          <div className="clean-card admin-modal-card" style={{
+            width: '100%',
+            maxWidth: '560px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '28px',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setIsCourseModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                backgroundColor: '#f1f5f9',
+                border: 'none',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#64748b',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} />
+            </button>
+
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>
+              {editingCourse ? 'Edit Program / Option' : 'Add New Program / Option'}
+            </h3>
+
+            {courseFormError && (
+              <div style={{ padding: '10px 14px', backgroundColor: 'rgba(185, 28, 28, 0.08)', color: '#b91c1c', fontSize: '12px', marginBottom: '16px', border: '1px solid #fecaca' }}>
+                {courseFormError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCourse}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label"><span>Program Title *</span></label>
+                <input
+                  type="text"
+                  required
+                  className="form-input"
+                  placeholder="e.g. Foundation Course"
+                  value={courseFormTitle}
+                  onChange={(e) => setCourseFormTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label"><span>Subtitle (optional)</span></label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. From Beginner to Intermediate"
+                  value={courseFormSubtitle}
+                  onChange={(e) => setCourseFormSubtitle(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label"><span>Tag *</span></label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="INTENSIVE PROGRAM"
+                    value={courseFormTag}
+                    onChange={(e) => setCourseFormTag(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label"><span>Badge</span></label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="ENROLLING NOW"
+                    value={courseFormBadge}
+                    onChange={(e) => setCourseFormBadge(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label"><span>Price (₹) *</span></label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    className="form-input"
+                    placeholder="159000"
+                    value={courseFormPrice}
+                    onChange={(e) => setCourseFormPrice(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label"><span>Original Price (₹ strikethrough)</span></label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="form-input"
+                    placeholder="170000"
+                    value={courseFormOriginalPrice}
+                    onChange={(e) => setCourseFormOriginalPrice(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label"><span>Duration *</span></label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="4 Months Intensive"
+                    value={courseFormDuration}
+                    onChange={(e) => setCourseFormDuration(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label"><span>Batch Size *</span></label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="13 Students per Batch"
+                    value={courseFormBatchSize}
+                    onChange={(e) => setCourseFormBatchSize(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label"><span>Flow Type *</span></label>
+                  <select
+                    className="form-input"
+                    value={courseFormType}
+                    onChange={(e) => {
+                      const val = e.target.value as 'course' | 'consultation';
+                      setCourseFormType(val);
+                      setCourseFormTaxRate(val === 'consultation' ? 0 : 0.18);
+                    }}
+                  >
+                    <option value="course">Course (Requires 9-Field KYC)</option>
+                    <option value="consultation">Discovery Call (Calendly Booking)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label"><span>Tax Rate *</span></label>
+                  <select
+                    className="form-input"
+                    value={courseFormTaxRate}
+                    onChange={(e) => setCourseFormTaxRate(Number(e.target.value))}
+                  >
+                    <option value={0.18}>18% GST (Standard Course)</option>
+                    <option value={0}>0% Tax (Consultation / Exempt)</option>
+                    <option value={0.12}>12% GST</option>
+                    <option value={0.05}>5% GST</option>
+                    <option value={0.28}>28% GST</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label"><span>Features (one per line)</span></label>
+                <textarea
+                  rows={4}
+                  className="form-input"
+                  placeholder={"1 Official Song Release\nDirect Weekly Feedback\nWhatsApp Mentorship Access"}
+                  value={courseFormFeatures}
+                  onChange={(e) => setCourseFormFeatures(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                  <input
+                    type="checkbox"
+                    checked={courseFormPopular}
+                    onChange={(e) => setCourseFormPopular(e.target.checked)}
+                    style={{ accentColor: '#b8871b' }}
+                  />
+                  <span>Highlight as Popular</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                  <input
+                    type="checkbox"
+                    checked={courseFormDisabled}
+                    onChange={(e) => setCourseFormDisabled(e.target.checked)}
+                    style={{ accentColor: '#b8871b' }}
+                  />
+                  <span>Disable (Hide from Public)</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingCourse}
+                className="btn-primary"
+                style={{ width: '100%', padding: '12px', fontSize: '13px' }}
+              >
+                {isSavingCourse ? 'Saving Option...' : editingCourse ? 'Save Changes' : '+ Create Option'}
+              </button>
+            </form>
           </div>
         </div>
       )}

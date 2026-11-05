@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Lock,
@@ -16,7 +16,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { COURSES, getCourseById } from '@/lib/courses';
-import { getPricing } from '@/lib/pricing';
+import { Course } from '@/types';
 import AuthModal from '@/components/AuthModal';
 
 function getFriendlyErrorMessage(rawError?: string | null): string {
@@ -81,9 +81,9 @@ function getFriendlyErrorMessage(rawError?: string | null): string {
 function HomeContent() {
   const searchParams = useSearchParams();
 
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('producer-transformation');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
 
-  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; hasPaidConsultation: boolean } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; hasPaidConsultation: boolean; allowedCourses?: string[] } | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [authActionPrompt, setAuthActionPrompt] = useState<string>('');
 
@@ -95,6 +95,18 @@ function HomeContent() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
+  const [courses, setCourses] = useState<Course[]>(COURSES);
+
+  useEffect(() => {
+    fetch('/api/courses')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.courses) && data.courses.length > 0) {
+          setCourses(data.courses);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const statusParam = searchParams.get('status');
   const errorParam = searchParams.get('error');
@@ -116,8 +128,14 @@ function HomeContent() {
             try {
               const res = await fetch(`/api/auth/consultation-status?email=${encodeURIComponent(parsed.email)}`);
               const data = await res.json();
-              if (data.hasPaidConsultation !== parsed.hasPaidConsultation) {
-                const updated = { ...parsed, hasPaidConsultation: !!data.hasPaidConsultation };
+              const hasPaidDiff = data.hasPaidConsultation !== parsed.hasPaidConsultation;
+              const allowedDiff = data.allowedCourses && JSON.stringify(data.allowedCourses) !== JSON.stringify(parsed.allowedCourses);
+              if (hasPaidDiff || allowedDiff) {
+                const updated = {
+                  ...parsed,
+                  hasPaidConsultation: !!data.hasPaidConsultation,
+                  allowedCourses: Array.isArray(data.allowedCourses) ? data.allowedCourses : (parsed.allowedCourses || [])
+                };
                 setCurrentUser(updated);
                 localStorage.setItem('mt_user', JSON.stringify(updated));
               }
@@ -140,28 +158,52 @@ function HomeContent() {
     };
   }, []);
 
-  const pricing = getPricing();
-  const selectedCourse = getCourseById(selectedCourseId) || COURSES[0];
-  const isProducerCourse = selectedCourseId === 'producer-transformation' || selectedCourseId === 'bootcamp';
-  const hasConsultationCredit = isProducerCourse && !!currentUser?.hasPaidConsultation;
-
-  const rawBaseFee = selectedCourse.price;
-  const effectiveBaseFee = hasConsultationCredit ? pricing.courseDiscountedPrice : rawBaseFee;
-
-  const isConsultationSelected = selectedCourseId === 'call-consultation';
-  const taxAmount = isConsultationSelected ? 0 : Math.round(effectiveBaseFee * 0.18);
-  const totalPayable = effectiveBaseFee + taxAmount;
+  const visibleCourses = useMemo(() => {
+    if (!currentUser || !currentUser.allowedCourses || currentUser.allowedCourses.length === 0) {
+      return courses.filter((c) => !c.disabled);
+    }
+    const filtered = courses.filter((c) => currentUser.allowedCourses!.includes(c.id));
+    return filtered.length > 0 ? filtered : courses.filter((c) => !c.disabled);
+  }, [courses, currentUser]);
 
   useEffect(() => {
-    if (currentUser?.hasPaidConsultation && selectedCourseId === 'call-consultation') {
-      setSelectedCourseId('producer-transformation');
+    if (visibleCourses.length > 0 && (!selectedCourseId || !visibleCourses.some((c) => c.id === selectedCourseId))) {
+      setSelectedCourseId(visibleCourses[0].id);
     }
-  }, [currentUser?.hasPaidConsultation, selectedCourseId]);
+  }, [visibleCourses, selectedCourseId]);
+
+  const selectedCourse = visibleCourses.find((c) => c.id === selectedCourseId) || visibleCourses[0] || courses[0];
+  const isConsultationSelected = selectedCourse ? (selectedCourse.type === 'consultation' || selectedCourse.id === 'call-consultation') : false;
+
+  const consultationCourse = courses.find((c) => c.type === 'consultation' || c.id === 'call-consultation');
+  const consultationCreditAmount = consultationCourse ? Number(consultationCourse.price) : 0;
+  const hasConsultationCredit = !isConsultationSelected && !!currentUser?.hasPaidConsultation && consultationCreditAmount > 0;
+
+  const rawBaseFee = selectedCourse ? Number(selectedCourse.price) : 0;
+  const effectiveBaseFee = hasConsultationCredit ? Math.max(0, rawBaseFee - consultationCreditAmount) : rawBaseFee;
+
+  const taxRate = selectedCourse && selectedCourse.taxRate !== undefined && selectedCourse.taxRate !== null
+    ? Number(selectedCourse.taxRate)
+    : (isConsultationSelected ? 0 : 0.18);
+  const taxPercentage = Math.round(taxRate * 100);
+  const rawTaxAmount = effectiveBaseFee * taxRate;
+  const taxAmount = Number(rawTaxAmount.toFixed(2));
+  const totalPayable = Number((effectiveBaseFee + taxAmount).toFixed(2));
+
+  useEffect(() => {
+    if (currentUser?.hasPaidConsultation && isConsultationSelected) {
+      const firstCourse = visibleCourses.find((c) => c.type !== 'consultation');
+      if (firstCourse) {
+        setSelectedCourseId(firstCourse.id);
+      }
+    }
+  }, [currentUser?.hasPaidConsultation, isConsultationSelected, visibleCourses]);
 
   const handleCourseSelect = (courseId: string) => {
-    const course = COURSES.find((c) => c.id === courseId);
+    const course = visibleCourses.find((c) => c.id === courseId) || courses.find((c) => c.id === courseId);
     if (course?.disabled) return;
-    if (courseId === 'call-consultation' && currentUser?.hasPaidConsultation) return;
+    const isConsultation = course?.type === 'consultation' || courseId === 'call-consultation';
+    if (isConsultation && currentUser?.hasPaidConsultation) return;
     setSelectedCourseId(courseId);
   };
 
@@ -249,11 +291,11 @@ function HomeContent() {
     },
     {
       q: 'What happens after completing Discovery Call payment?',
-      a: `Schedule immediately via Calendly upon payment. If you decide to join the Producer Transformation Path, the ${pricing.creditText} Discovery Call fee will be deducted from the course fee.`
+      a: 'Schedule immediately via Calendly upon payment. If you decide to join a mentorship course, your Discovery Call fee will be deducted directly from the course fee.'
     },
     {
-      q: `How does the ${pricing.creditText} Discovery Call credit work?`,
-      a: `When you log in with the email used for your Discovery Call, the Producer Transformation Path program fee automatically reduces from ${pricing.coursePriceText} to ${pricing.courseDiscountedText} (+ 18% tax), giving you full credit for your consultation fee.`
+      q: 'How does the Discovery Call credit work?',
+      a: 'When you log in with the email used for your Discovery Call, your eligible course fee automatically deducts your full consultation fee, giving you 100% credit.'
     },
     {
       q: 'What happens after completing the course fee payment?',
@@ -382,18 +424,17 @@ function HomeContent() {
                 Select Your Program or Consultation
               </h2>
               <span style={{ fontSize: '12px', color: '#64748b' }}>
-                2 Available Options
+                {visibleCourses.length} Available Option{visibleCourses.length === 1 ? '' : 's'}
               </span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {COURSES.map((course) => {
+              {visibleCourses.map((course) => {
                 const isSelected = selectedCourseId === course.id;
-                const isCallConsultation = course.id === 'call-consultation';
+                const isCallConsultation = course.type === 'consultation' || course.id === 'call-consultation';
                 const hasPaidConsultation = !!currentUser?.hasPaidConsultation;
                 const isDisabled = !!course.disabled || (isCallConsultation && hasPaidConsultation);
-                const isCourseProducer = course.id === 'producer-transformation' || course.id === 'bootcamp';
-                const hasCredit = isCourseProducer && hasPaidConsultation;
+                const hasCredit = !isCallConsultation && hasPaidConsultation && consultationCreditAmount > 0;
 
                 return (
                   <div
@@ -437,7 +478,7 @@ function HomeContent() {
                         color: isDisabled && !isCallConsultation ? '#94a3b8' : '#b8871b',
                         letterSpacing: '0.5px'
                       }}>
-                        {course.tag}
+                        {course.tag ? course.tag.replace(/^\d+\s*\/\s*/, '') : ''}
                       </div>
 
                       {course.badge && (
@@ -482,7 +523,7 @@ function HomeContent() {
 
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: course.id === 'call-consultation' ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))',
+                      gridTemplateColumns: isCallConsultation ? '1fr' : 'repeat(auto-fit, minmax(210px, 1fr))',
                       gap: '8px',
                       marginBottom: '16px'
                     }}>
@@ -522,31 +563,31 @@ function HomeContent() {
                           {hasCredit ? (
                             <>
                               <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
-                                {pricing.courseDiscountedText}
+                                ₹{Math.max(0, Number(course.price) - consultationCreditAmount).toLocaleString('en-IN', { minimumFractionDigits: Number(course.price) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                               </span>
                               <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
-                                {pricing.coursePriceText}
+                                ₹{Number(course.price).toLocaleString('en-IN', { minimumFractionDigits: Number(course.price) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                               </span>
                               {course.originalPrice && (
                                 <span style={{ fontSize: '12px', color: '#cbd5e1', textDecoration: 'line-through' }}>
-                                  ₹{course.originalPrice.toLocaleString('en-IN')}
+                                  ₹{Number(course.originalPrice).toLocaleString('en-IN')}
                                 </span>
                               )}
                             </>
                           ) : (
                             <>
                               <span style={{ fontSize: '22px', fontWeight: 800, color: isDisabled && !isCallConsultation ? '#64748b' : '#0f172a' }}>
-                                ₹{course.price.toLocaleString('en-IN')}
+                                ₹{Number(course.price).toLocaleString('en-IN', { minimumFractionDigits: Number(course.price) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                               </span>
                               {course.originalPrice && (
-                                <span style={{ fontSize: '14px', color: '#94a3b8', textDecoration: 'line-through' }}>
-                                  ₹{course.originalPrice.toLocaleString('en-IN')}
+                                <span style={{ fontSize: '12px', color: '#94a3b8', textDecoration: 'line-through' }}>
+                                  ₹{Number(course.originalPrice).toLocaleString('en-IN')}
                                 </span>
                               )}
                             </>
                           )}
 
-                          {course.id === 'call-consultation' ? (
+                          {course.taxRate === 0 || (!course.taxRate && isCallConsultation) ? (
                             <span style={{
                               fontSize: '11px',
                               color: '#15803d',
@@ -564,7 +605,7 @@ function HomeContent() {
                               backgroundColor: 'rgba(226, 177, 60, 0.12)',
                               padding: '3px 7px'
                             }}>
-                              + Taxes apply additionally
+                              + {Math.round((course.taxRate !== undefined ? Number(course.taxRate) : 0.18) * 100)}% GST
                             </span>
                           )}
                         </div>
@@ -763,7 +804,7 @@ function HomeContent() {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '8px' }}>
                     <span>{selectedCourse.title} Base Fee:</span>
-                    <span>₹{rawBaseFee.toLocaleString('en-IN')}</span>
+                    <span>₹{rawBaseFee.toLocaleString('en-IN', { minimumFractionDigits: rawBaseFee % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}</span>
                   </div>
 
                   {hasConsultationCredit && (
@@ -777,21 +818,23 @@ function HomeContent() {
                       padding: '4px 8px'
                     }}>
                       <span>Discovery Call Credit Paid:</span>
-                      <span>-{pricing.creditText}</span>
+                      <span>-₹{consultationCreditAmount.toLocaleString('en-IN', { minimumFractionDigits: consultationCreditAmount % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
                   {hasConsultationCredit && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '8px' }}>
                       <span>Adjusted Subtotal:</span>
-                      <span>₹{effectiveBaseFee.toLocaleString('en-IN')}</span>
+                      <span>₹{effectiveBaseFee.toLocaleString('en-IN', { minimumFractionDigits: effectiveBaseFee % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#0f172a', marginBottom: '8px' }}>
-                    <span>{isConsultationSelected ? 'Tax:' : 'Additional Tax (18% GST):'}</span>
-                    <span style={{ fontWeight: 600, color: isConsultationSelected ? '#15803d' : '#b8871b' }}>
-                      {isConsultationSelected ? '₹0 (No Tax)' : `+₹${taxAmount.toLocaleString('en-IN')}`}
+                    <span>{taxRate > 0 ? `Additional Tax (${Math.round(taxRate * 100)}% GST):` : 'Tax:'}</span>
+                    <span style={{ fontWeight: 600, color: taxRate > 0 ? '#b8871b' : '#15803d' }}>
+                      {taxRate > 0
+                        ? `+₹${taxAmount.toLocaleString('en-IN', { minimumFractionDigits: taxAmount % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`
+                        : '₹0 (No Tax)'}
                     </span>
                   </div>
 
@@ -807,7 +850,7 @@ function HomeContent() {
                   }}>
                     <span>Total Payable:</span>
                     <span style={{ color: '#000000', fontSize: '20px', fontWeight: 800 }}>
-                      ₹{totalPayable.toLocaleString('en-IN')}
+                      ₹{totalPayable.toLocaleString('en-IN', { minimumFractionDigits: totalPayable % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>

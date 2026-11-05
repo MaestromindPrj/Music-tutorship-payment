@@ -15,6 +15,7 @@ export interface UserAccount {
   name: string;
   password: string;
   hasPaidConsultation: boolean;
+  allowedCourses?: string[];
   createdAt: string;
   lastLoginAt?: string;
   googleId?: string;
@@ -135,6 +136,7 @@ export async function adminCreateUser(params: {
   password: string;
   name?: string;
   hasPaidConsultation?: boolean;
+  allowedCourses?: string[];
 }): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
   const cleanEmail = params.email.trim().toLowerCase();
 
@@ -159,6 +161,7 @@ export async function adminCreateUser(params: {
     name: params.name?.trim() || cleanEmail.split('@')[0],
     password: hashedPassword,
     hasPaidConsultation: Boolean(params.hasPaidConsultation),
+    allowedCourses: params.allowedCourses || [],
     createdAt: new Date().toISOString()
   };
 
@@ -178,6 +181,7 @@ export async function adminUpdateUser(params: {
   email: string;
   password?: string;
   name?: string;
+  allowedCourses?: string[];
 }): Promise<{ success: boolean; error?: string }> {
   const cleanEmail = params.email.trim().toLowerCase();
 
@@ -201,11 +205,13 @@ export async function adminUpdateUser(params: {
 
   await neonUpdateUser(cleanEmail, {
     password: hashedPassword,
-    name: params.name?.trim()
+    name: params.name?.trim(),
+    allowedCourses: params.allowedCourses
   });
 
   if (hashedPassword) existing.password = hashedPassword;
   if (params.name) existing.name = params.name.trim();
+  if (params.allowedCourses !== undefined) existing.allowedCourses = params.allowedCourses;
   userStore.set(cleanEmail, existing);
 
   return { success: true };
@@ -282,6 +288,7 @@ export async function getAllUsersForAdmin(): Promise<Array<{
   email: string;
   name: string;
   hasPaidConsultation: boolean;
+  allowedCourses?: string[];
   createdAt: string;
   lastLoginAt?: string;
 }>> {
@@ -299,6 +306,7 @@ export async function getAllUsersForAdmin(): Promise<Array<{
     email: u.email,
     name: u.name,
     hasPaidConsultation: u.hasPaidConsultation,
+    allowedCourses: u.allowedCourses || [],
     createdAt: u.createdAt,
     lastLoginAt: u.createdAt
   }));

@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import { neon, neonConfig } from '@neondatabase/serverless';
 import https from 'https';
 import { Resolver } from 'dns';
-import { PaymentRecord, StudentRegistration } from '@/types';
+import { PaymentRecord, StudentRegistration, Course } from '@/types';
 import { UserAccount } from './auth';
+import { getPricing } from './pricing';
 
 export interface AdminStats {
   totalRevenue: number;
@@ -197,6 +198,87 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
 
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);`;
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS allowed_courses TEXT[] DEFAULT '{}';`;
+    await sql`UPDATE courses SET tag = 'INTENSIVE PROGRAM' WHERE id = 'producer-transformation' AND tag LIKE '%INTENSIVE%';`;
+    await sql`UPDATE courses SET tag = 'STRATEGY SESSION' WHERE id = 'call-consultation' AND tag LIKE '%STRATEGY%';`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS courses (
+        id VARCHAR(100) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        subtitle VARCHAR(255),
+        tag VARCHAR(100) NOT NULL,
+        badge VARCHAR(100),
+        price NUMERIC(12, 2) NOT NULL,
+        original_price NUMERIC(12, 2),
+        duration VARCHAR(100) NOT NULL,
+        batch_size VARCHAR(100) NOT NULL,
+        features TEXT[] NOT NULL DEFAULT '{}',
+        type VARCHAR(50) NOT NULL DEFAULT 'course',
+        tax_rate NUMERIC(4, 2) NOT NULL DEFAULT 0.18,
+        popular BOOLEAN DEFAULT FALSE,
+        disabled BOOLEAN DEFAULT FALSE,
+        order_index INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `;
+
+    try {
+      const existingCourses = await sql`SELECT COUNT(*)::int as count FROM courses;`;
+      if (existingCourses && existingCourses[0]?.count === 0) {
+        const pricing = getPricing();
+        await sql`
+          INSERT INTO courses (
+            id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index
+          ) VALUES (
+            'producer-transformation',
+            'Producer Transformation Path',
+            'From Intermediate to Advanced',
+            'INTENSIVE PROGRAM',
+            'ENROLLING NOW',
+            ${pricing.coursePrice},
+            ${pricing.courseOriginalPrice || 170000},
+            '4 Months Intensive (Hybrid)',
+            '13 Students per Batch',
+            ${[
+              '1 Official Commercial Song Release Guaranteed',
+              'Signature Sound Synthesis & Beat Making',
+              'Vocal Processing & Layering Mastery',
+              'Arrangement Strategies for Hit Records',
+              'Direct Weekly Feedback on Your Projects',
+              'Release Strategy, Distribution & Streaming Guidance',
+              'Direct WhatsApp Mentorship Access'
+            ]},
+            'course',
+            0.18,
+            true,
+            false,
+            1
+          ), (
+            'call-consultation',
+            'Discovery Call',
+            NULL,
+            'STRATEGY SESSION',
+            'CALENDLY BOOKING',
+            ${pricing.consultationPrice},
+            NULL,
+            '60 Minutes Live Session',
+            'Private 1-on-1 Call',
+            ${[
+              'Schedule immediately via Calendly upon payment.',
+              `If you decide to join the Producer Transformation Path, the ${pricing.creditText} Discovery Call fee will be deducted from the course fee.`
+            ]},
+            'consultation',
+            0,
+            false,
+            false,
+            2
+          );
+        `;
+      }
+    } catch (e) {
+    }
 
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_email ON payments(email);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);`;
@@ -229,7 +311,7 @@ export async function neonFindUserByEmail(email: string): Promise<UserAccount | 
 
   const cleanEmail = email.trim().toLowerCase();
   const rows = await sql`
-    SELECT id, email, name, password, has_paid_consultation, google_id, avatar_url, created_at, last_login_at
+    SELECT id, email, name, password, has_paid_consultation, allowed_courses, google_id, avatar_url, created_at, last_login_at
     FROM users
     WHERE email = ${cleanEmail}
     LIMIT 1;
@@ -243,6 +325,7 @@ export async function neonFindUserByEmail(email: string): Promise<UserAccount | 
     name: row.name,
     password: row.password,
     hasPaidConsultation: Boolean(row.has_paid_consultation),
+    allowedCourses: Array.isArray(row.allowed_courses) ? row.allowed_courses : [],
     googleId: row.google_id || undefined,
     avatarUrl: row.avatar_url || undefined,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
@@ -256,13 +339,14 @@ export async function neonSaveUser(user: UserAccount): Promise<boolean> {
 
   const cleanEmail = user.email.trim().toLowerCase();
   await sql`
-    INSERT INTO users (id, email, name, password, has_paid_consultation, google_id, avatar_url, created_at, updated_at, last_login_at)
+    INSERT INTO users (id, email, name, password, has_paid_consultation, allowed_courses, google_id, avatar_url, created_at, updated_at, last_login_at)
     VALUES (
       ${user.id},
       ${cleanEmail},
       ${user.name},
       ${user.password},
       ${user.hasPaidConsultation},
+      ${user.allowedCourses || []},
       ${user.googleId || null},
       ${user.avatarUrl || null},
       NOW(),
@@ -273,6 +357,7 @@ export async function neonSaveUser(user: UserAccount): Promise<boolean> {
       name = EXCLUDED.name,
       password = EXCLUDED.password,
       has_paid_consultation = EXCLUDED.has_paid_consultation,
+      allowed_courses = EXCLUDED.allowed_courses,
       google_id = COALESCE(users.google_id, EXCLUDED.google_id),
       avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
       last_login_at = NOW(),
@@ -294,13 +379,20 @@ export async function neonUpdateUserLastLogin(email: string): Promise<void> {
 
 export async function neonUpdateUser(
   email: string,
-  updates: { password?: string; name?: string }
+  updates: { password?: string; name?: string; allowedCourses?: string[] }
 ): Promise<boolean> {
   const sql = getNeonSql();
   if (!sql) return false;
   await ensureDbInitialized();
 
   const cleanEmail = email.trim().toLowerCase();
+  if (updates.allowedCourses !== undefined) {
+    await sql`
+      UPDATE users
+      SET allowed_courses = ${updates.allowedCourses}, updated_at = NOW()
+      WHERE email = ${cleanEmail};
+    `;
+  }
   if (updates.password && updates.name) {
     await sql`
       UPDATE users
@@ -363,7 +455,7 @@ export async function neonGetAllUsers(): Promise<Array<{
   await ensureDbInitialized();
 
   const rows = await sql`
-    SELECT id, email, name, has_paid_consultation, created_at, last_login_at
+    SELECT id, email, name, has_paid_consultation, allowed_courses, google_id, avatar_url, created_at, last_login_at
     FROM users
     ORDER BY created_at DESC;
   `;
@@ -373,6 +465,7 @@ export async function neonGetAllUsers(): Promise<Array<{
     email: r.email,
     name: r.name,
     hasPaidConsultation: Boolean(r.has_paid_consultation),
+    allowedCourses: Array.isArray(r.allowed_courses) ? r.allowed_courses : [],
     googleId: r.google_id || undefined,
     avatarUrl: r.avatar_url || undefined,
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
@@ -960,4 +1053,148 @@ function mapPaymentRow(r: any): PaymentRecord {
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString()
   };
+}
+
+
+export async function neonGetAllCourses(): Promise<Course[]> {
+  const sql = getNeonSql();
+  if (!sql) return [];
+  await ensureDbInitialized();
+
+  const rows = await sql`
+    SELECT id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, created_at, updated_at
+    FROM courses
+    ORDER BY order_index ASC, created_at ASC;
+  `;
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    subtitle: r.subtitle || undefined,
+    tag: r.tag ? r.tag.replace(/^\d+\s*\/\s*/, '') : '',
+    badge: r.badge || undefined,
+    price: Number(r.price),
+    originalPrice: r.original_price ? Number(r.original_price) : undefined,
+    duration: r.duration,
+    batchSize: r.batch_size,
+    features: Array.isArray(r.features) ? r.features : [],
+    type: (r.type as 'course' | 'consultation') || 'course',
+    taxRate: r.tax_rate !== null && r.tax_rate !== undefined ? Number(r.tax_rate) : 0.18,
+    popular: Boolean(r.popular),
+    disabled: Boolean(r.disabled),
+    orderIndex: r.order_index ? Number(r.order_index) : 0,
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined
+  }));
+}
+
+export async function neonGetCourseById(id: string): Promise<Course | null> {
+  const sql = getNeonSql();
+  if (!sql) return null;
+  await ensureDbInitialized();
+
+  const rows = await sql`
+    SELECT id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, created_at, updated_at
+    FROM courses
+    WHERE id = ${id}
+    LIMIT 1;
+  `;
+
+  if (!rows || rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    id: r.id,
+    title: r.title,
+    subtitle: r.subtitle || undefined,
+    tag: r.tag ? r.tag.replace(/^\d+\s*\/\s*/, '') : '',
+    badge: r.badge || undefined,
+    price: Number(r.price),
+    originalPrice: r.original_price ? Number(r.original_price) : undefined,
+    duration: r.duration,
+    batchSize: r.batch_size,
+    features: Array.isArray(r.features) ? r.features : [],
+    type: (r.type as 'course' | 'consultation') || 'course',
+    taxRate: r.tax_rate !== null && r.tax_rate !== undefined ? Number(r.tax_rate) : 0.18,
+    popular: Boolean(r.popular),
+    disabled: Boolean(r.disabled),
+    orderIndex: r.order_index ? Number(r.order_index) : 0,
+    createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
+    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined
+  };
+}
+
+export async function neonSaveCourse(course: Course): Promise<boolean> {
+  const sql = getNeonSql();
+  if (!sql) return false;
+  await ensureDbInitialized();
+
+  await sql`
+    INSERT INTO courses (
+      id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, created_at, updated_at
+    ) VALUES (
+      ${course.id},
+      ${course.title},
+      ${course.subtitle || null},
+      ${course.tag},
+      ${course.badge || null},
+      ${course.price},
+      ${course.originalPrice || null},
+      ${course.duration},
+      ${course.batchSize},
+      ${course.features || []},
+      ${course.type || 'course'},
+      ${course.taxRate !== undefined ? course.taxRate : 0.18},
+      ${Boolean(course.popular)},
+      ${Boolean(course.disabled)},
+      ${course.orderIndex || 0},
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      title = EXCLUDED.title,
+      subtitle = EXCLUDED.subtitle,
+      tag = EXCLUDED.tag,
+      badge = EXCLUDED.badge,
+      price = EXCLUDED.price,
+      original_price = EXCLUDED.original_price,
+      duration = EXCLUDED.duration,
+      batch_size = EXCLUDED.batch_size,
+      features = EXCLUDED.features,
+      type = EXCLUDED.type,
+      tax_rate = EXCLUDED.tax_rate,
+      popular = EXCLUDED.popular,
+      disabled = EXCLUDED.disabled,
+      order_index = EXCLUDED.order_index,
+      updated_at = NOW();
+  `;
+  return true;
+}
+
+export async function neonUpdateCourse(id: string, updates: Partial<Course>): Promise<boolean> {
+  const sql = getNeonSql();
+  if (!sql) return false;
+  await ensureDbInitialized();
+
+  const existing = await neonGetCourseById(id);
+  if (!existing) return false;
+
+  const merged: Course = {
+    ...existing,
+    ...updates,
+    id
+  };
+
+  return neonSaveCourse(merged);
+}
+
+export async function neonDeleteCourse(id: string): Promise<boolean> {
+  const sql = getNeonSql();
+  if (!sql) return false;
+  await ensureDbInitialized();
+
+  await sql`
+    DELETE FROM courses
+    WHERE id = ${id};
+  `;
+  return true;
 }

@@ -6,7 +6,8 @@ import {
   getAdminDashboardStats
 } from '@/lib/db';
 import { getAllUsersForAdmin } from '@/lib/auth';
-import { getDatabaseUrl } from '@/lib/neon';
+import { neonGetAllCourses, getDatabaseUrl } from '@/lib/neon';
+import { getCourses } from '@/lib/courses';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,11 +16,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Admin authentication required' }, { status: 401 });
     }
 
-    const [stats, payments, registrations, users] = await Promise.all([
+    const [stats, payments, registrations, users, courses] = await Promise.all([
       getAdminDashboardStats(),
       getAllPaymentsForAdmin(),
       getAllRegistrationsForAdmin(),
-      getAllUsersForAdmin()
+      getAllUsersForAdmin(),
+      neonGetAllCourses().then((list) => (list && list.length > 0 ? list : getCourses())).catch(() => getCourses())
     ]);
 
     const isConnectedToNeon = !!getDatabaseUrl();
@@ -30,7 +32,8 @@ export async function GET(req: NextRequest) {
       stats,
       payments,
       registrations,
-      users
+      users,
+      courses
     });
   } catch (error: any) {
     console.error('Admin data fetch error:', error);

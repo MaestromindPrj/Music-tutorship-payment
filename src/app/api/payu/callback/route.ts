@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPayUConfig, verifyPayUResponseHash } from '@/lib/payu';
 import { updatePaymentStatus } from '@/lib/db';
 import { markConsultationPaid } from '@/lib/auth';
+import { neonGetCourseById } from '@/lib/neon';
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,10 +73,20 @@ export async function POST(req: NextRequest) {
 
     const isSuccess = (status?.toLowerCase() === 'success' || status?.toLowerCase() === 'captured') && isVerified;
 
-    const isConsultationTxn =
+    let isConsultationTxn =
       udf1 === 'call-consultation' ||
       productinfo?.toLowerCase().includes('consultation') ||
       productinfo?.toLowerCase().includes('discovery');
+
+    if (udf1) {
+      try {
+        const course = await neonGetCourseById(udf1);
+        if (course?.type === 'consultation') {
+          isConsultationTxn = true;
+        }
+      } catch (e) {
+      }
+    }
 
     if (isSuccess && isConsultationTxn && email) {
       await markConsultationPaid(email);

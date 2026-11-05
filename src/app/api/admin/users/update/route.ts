@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, name } = body;
+    const { email, password, name, allowedCourses } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!password && !name) {
+    if (!password && !name && allowedCourses === undefined) {
       return NextResponse.json(
-        { error: 'Provide at least a new password or name to update' },
+        { error: 'Provide at least a new password, name, or options to update' },
         { status: 400 }
       );
     }
@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
     const result = await adminUpdateUser({
       email,
       password,
-      name
+      name,
+      allowedCourses: Array.isArray(allowedCourses) ? allowedCourses : undefined
     });
 
     if (!result.success) {
@@ -53,4 +54,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

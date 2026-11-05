@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPayUConfig, generatePayUHash, generateTxnId } from '@/lib/payu';
+import { neonGetCourseById, neonGetAllCourses } from '@/lib/neon';
 import { getCourseById } from '@/lib/courses';
-import { getPricing } from '@/lib/pricing';
 import { savePayment } from '@/lib/db';
 import { hasUserPaidConsultation } from '@/lib/auth';
 import { PayUInitiatePayload, PayUFormData } from '@/types';
@@ -19,8 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const course = getCourseById(courseId);
-    const pricing = getPricing();
+    const course = (await neonGetCourseById(courseId).catch(() => null)) || getCourseById(courseId);
     
     const hasConsultationCredit = await hasUserPaidConsultation(cleanEmail);
 
@@ -31,16 +30,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let basePrice = course ? course.price : pricing.coursePrice;
-    if ((courseId === 'producer-transformation' || courseId === 'bootcamp') && hasConsultationCredit) {
-      basePrice = pricing.courseDiscountedPrice;
-    } else if (courseId === 'call-consultation') {
-      basePrice = pricing.consultationPrice;
+    const isCallConsultation = courseId === 'call-consultation' || course?.type === 'consultation';
+    let basePrice = course ? Number(course.price) : (customAmount || 0);
+
+    if (!isCallConsultation && hasConsultationCredit) {
+      try {
+        const allCourses = await neonGetAllCourses();
+        const consultCourse = allCourses.find((c) => c.type === 'consultation' || c.id === 'call-consultation');
+        const creditAmount = consultCourse ? Number(consultCourse.price) : 0;
+        basePrice = Math.max(0, basePrice - creditAmount);
+      } catch (e) {
+      }
     }
 
-    const isCallConsultation = courseId === 'call-consultation';
-    const taxAmount = isCallConsultation ? 0 : Math.round(basePrice * 0.18);
-    const totalAmount = basePrice + taxAmount;
+    const taxRate = course?.taxRate !== undefined && course?.taxRate !== null
+      ? Number(course.taxRate)
+      : (isCallConsultation ? 0 : 0.18);
+    const taxAmount = Number((basePrice * taxRate).toFixed(2));
+    const totalAmount = Number((basePrice + taxAmount).toFixed(2));
 
     const amountFormatted = totalAmount.toFixed(2);
     const txnid = generateTxnId();

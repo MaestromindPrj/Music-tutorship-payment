@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hasUserPaidConsultation, markConsultationPaid } from '@/lib/auth';
+import { hasUserPaidConsultation, markConsultationPaid, findUserByEmail } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
     const email = req.nextUrl.searchParams.get('email');
     if (!email) {
-      return NextResponse.json({ hasPaidConsultation: false });
+      return NextResponse.json({ hasPaidConsultation: false, allowedCourses: [] });
     }
 
-    const hasPaid = await hasUserPaidConsultation(email);
-    return NextResponse.json({ hasPaidConsultation: hasPaid });
+    const [hasPaid, user] = await Promise.all([
+      hasUserPaidConsultation(email),
+      findUserByEmail(email)
+    ]);
+
+    return NextResponse.json({
+      hasPaidConsultation: hasPaid,
+      allowedCourses: user?.allowedCourses || []
+    });
   } catch (err: any) {
-    return NextResponse.json({ hasPaidConsultation: false, error: err?.message });
+    return NextResponse.json({ hasPaidConsultation: false, allowedCourses: [], error: err?.message });
   }
 }
 
@@ -28,8 +35,16 @@ export async function POST(req: NextRequest) {
       await markConsultationPaid(email);
     }
 
-    const hasPaid = await hasUserPaidConsultation(email);
-    return NextResponse.json({ success: true, hasPaidConsultation: hasPaid });
+    const [hasPaid, user] = await Promise.all([
+      hasUserPaidConsultation(email),
+      findUserByEmail(email)
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      hasPaidConsultation: hasPaid,
+      allowedCourses: user?.allowedCourses || []
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }

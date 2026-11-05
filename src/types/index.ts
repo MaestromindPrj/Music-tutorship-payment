@@ -10,8 +10,13 @@ export interface Course {
   duration: string;
   batchSize: string;
   features: string[];
+  type?: 'course' | 'consultation';
+  taxRate?: number;
+  orderIndex?: number;
   popular?: boolean;
   disabled?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PaymentRecord {

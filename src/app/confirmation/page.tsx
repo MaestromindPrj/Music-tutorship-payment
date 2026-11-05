@@ -14,12 +14,10 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { PaymentRecord, StudentRegistration } from '@/types';
-import { getPricing } from '@/lib/pricing';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const txnid = searchParams.get('txnid') || '';
-  const pricing = getPricing();
 
   const [isLoading, setIsLoading] = useState(true);
   const [payment, setPayment] = useState<PaymentRecord | null>(null);
@@ -259,7 +257,7 @@ function ConfirmationContent() {
           }}>
             <Sparkles size={18} style={{ color: '#b8871b', flexShrink: 0, marginTop: '2px' }} />
             <div style={{ fontSize: '12px', color: '#854d0e', lineHeight: 1.5 }}>
-              <strong>{pricing.creditText} Credit Saved:</strong> If you decide to join the <strong>Producer Transformation Path</strong>, the {pricing.creditText} Discovery Call fee will be deducted from the course fee (reducing {pricing.coursePriceText} to {pricing.courseDiscountedText} + 18% Tax) when logged in with <strong>{payment?.email}</strong>.
+              <strong>Credit Saved:</strong> If you decide to join an intensive course, your Discovery Call fee will be deducted directly from the course fee when logged in with <strong>{payment?.email}</strong>.
               <div style={{ marginTop: '8px' }}>
                 <Link
                   href="/"
@@ -272,7 +270,7 @@ function ConfirmationContent() {
                     gap: '4px'
                   }}
                 >
-                  <span>Proceed to Producer Transformation Path (Save {pricing.creditText})</span>
+                  <span>Proceed to Course Enrollment (Apply Consultation Credit)</span>
                   <ArrowRight size={13} />
                 </Link>
               </div>
@@ -433,7 +431,7 @@ function ConfirmationContent() {
             fontWeight: 700,
             color: '#0f172a'
           }}>
-            <span>Total Paid (Including 18% Tax):</span>
+            <span>{isConsultation ? 'Total Amount Paid:' : 'Total Paid (Including Tax):'}</span>
             <span style={{ color: '#000000', fontSize: '18px', fontWeight: 800 }}>
               ₹{payment ? Number(payment.amount).toLocaleString('en-IN') : '0.00'}
             </span>

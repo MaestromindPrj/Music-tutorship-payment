@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, name, hasPaidConsultation } = body;
+    const { email, password, name, hasPaidConsultation, allowedCourses } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
       email,
       password,
       name,
-      hasPaidConsultation: Boolean(hasPaidConsultation)
+      hasPaidConsultation: Boolean(hasPaidConsultation),
+      allowedCourses: Array.isArray(allowedCourses) ? allowedCourses : []
     });
 
     if (!result.success || !result.user) {
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
         email: result.user.email,
         name: result.user.name,
         hasPaidConsultation: result.user.hasPaidConsultation,
+        allowedCourses: result.user.allowedCourses || [],
         createdAt: result.user.createdAt
       }
     });
@@ -55,4 +57,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
