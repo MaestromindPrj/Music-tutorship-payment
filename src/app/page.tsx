@@ -77,6 +77,62 @@ function getFriendlyErrorMessage(rawError?: string | null): string {
     : rawError;
 }
 
+function CourseCardsSkeleton() {
+  return (
+    <>
+      <div
+        className="clean-card course-selection-card"
+        style={{
+          padding: '24px',
+          border: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div className="skeleton-box" style={{ width: '130px', height: '14px' }} />
+          <div className="skeleton-box" style={{ width: '90px', height: '20px' }} />
+        </div>
+        <div className="skeleton-box" style={{ width: '60%', height: '22px', marginBottom: '8px' }} />
+        <div className="skeleton-box" style={{ width: '35%', height: '13px', marginBottom: '18px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+          <div className="skeleton-box" style={{ width: '90%', height: '14px' }} />
+          <div className="skeleton-box" style={{ width: '85%', height: '14px' }} />
+          <div className="skeleton-box" style={{ width: '80%', height: '14px' }} />
+          <div className="skeleton-box" style={{ width: '75%', height: '14px' }} />
+        </div>
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="skeleton-box" style={{ width: '120px', height: '28px' }} />
+          <div className="skeleton-box" style={{ width: '80px', height: '22px' }} />
+        </div>
+      </div>
+
+      <div
+        className="clean-card course-selection-card"
+        style={{
+          padding: '24px',
+          border: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div className="skeleton-box" style={{ width: '110px', height: '14px' }} />
+          <div className="skeleton-box" style={{ width: '80px', height: '20px' }} />
+        </div>
+        <div className="skeleton-box" style={{ width: '50%', height: '22px', marginBottom: '8px' }} />
+        <div className="skeleton-box" style={{ width: '30%', height: '13px', marginBottom: '18px' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+          <div className="skeleton-box" style={{ width: '80%', height: '14px' }} />
+          <div className="skeleton-box" style={{ width: '70%', height: '14px' }} />
+        </div>
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="skeleton-box" style={{ width: '100px', height: '28px' }} />
+          <div className="skeleton-box" style={{ width: '80px', height: '22px' }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 function HomeContent() {
   const searchParams = useSearchParams();
 
@@ -431,16 +487,13 @@ function HomeContent() {
                 Select Your Program or Consultation
               </h2>
               <span style={{ fontSize: '12px', color: '#64748b' }}>
-                {isLoadingCourses ? 'Loading...' : `${visibleCourses.length} Available Option${visibleCourses.length === 1 ? '' : 's'}`}
+                {isLoadingCourses ? <span className="skeleton-box" style={{ display: 'inline-block', width: '90px', height: '14px', verticalAlign: 'middle' }} /> : `${visibleCourses.length} Available Option${visibleCourses.length === 1 ? '' : 's'}`}
               </span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {isLoadingCourses ? (
-                <div style={{ padding: '48px 24px', textAlign: 'center', color: '#64748b' }}>
-                  <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 12px' }} />
-                  <span style={{ fontSize: '13px' }}>Loading programs...</span>
-                </div>
+                <CourseCardsSkeleton />
               ) : visibleCourses.length === 0 ? (
                 <div style={{ padding: '36px 20px', textAlign: 'center', color: '#64748b', border: '1px dashed #cbd5e1' }}>
                   <span style={{ fontSize: '14px' }}>No programs currently available.</span>
@@ -745,7 +798,7 @@ function HomeContent() {
                   Enrollment Summary
                 </h3>
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                  {selectedCourse ? selectedCourse.title : (isLoadingCourses ? 'Loading program details...' : 'Select a program')}
+                  {selectedCourse ? selectedCourse.title : (isLoadingCourses ? <span className="skeleton-box" style={{ display: 'inline-block', width: '150px', height: '14px', verticalAlign: 'middle' }} /> : 'Select a program')}
                 </p>
               </div>
 
