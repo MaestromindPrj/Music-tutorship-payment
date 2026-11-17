@@ -7,7 +7,6 @@ import {
 } from '@/lib/db';
 import { getAllUsersForAdmin } from '@/lib/auth';
 import { neonGetAllCourses, getDatabaseUrl } from '@/lib/neon';
-import { getCourses } from '@/lib/courses';
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
       getAllPaymentsForAdmin(),
       getAllRegistrationsForAdmin(),
       getAllUsersForAdmin(),
-      neonGetAllCourses().then((list) => (list && list.length > 0 ? list : getCourses())).catch(() => getCourses())
+      neonGetAllCourses().then((list) => list || []).catch(() => [])
     ]);
 
     const isConnectedToNeon = !!getDatabaseUrl();

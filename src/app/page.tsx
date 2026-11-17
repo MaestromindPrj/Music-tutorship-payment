@@ -15,7 +15,6 @@ import {
   Calendar,
   ExternalLink
 } from 'lucide-react';
-import { COURSES, getCourseById } from '@/lib/courses';
 import { Course } from '@/types';
 import AuthModal from '@/components/AuthModal';
 
@@ -95,17 +94,21 @@ function HomeContent() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
-  const [courses, setCourses] = useState<Course[]>(COURSES);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(true);
 
   useEffect(() => {
     fetch('/api/courses')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && Array.isArray(data.courses) && data.courses.length > 0) {
+        if (data.success && Array.isArray(data.courses)) {
           setCourses(data.courses);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setIsLoadingCourses(false);
+      });
   }, []);
 
   const statusParam = searchParams.get('status');
@@ -176,8 +179,12 @@ function HomeContent() {
   const isConsultationSelected = selectedCourse ? (selectedCourse.type === 'consultation' || selectedCourse.id === 'call-consultation') : false;
 
   const consultationCourse = courses.find((c) => c.type === 'consultation' || c.id === 'call-consultation');
-  const consultationCreditAmount = consultationCourse ? Number(consultationCourse.price) : 0;
-  const hasConsultationCredit = !isConsultationSelected && !!currentUser?.hasPaidConsultation && consultationCreditAmount > 0;
+  const defaultConsultationCredit = consultationCourse ? Number(consultationCourse.price) : 0;
+  const isSelectedCourseCreditAllowed = selectedCourse ? (selectedCourse.allowConsultationCredit !== false) : true;
+  const consultationCreditAmount = (selectedCourse?.consultationCreditDiscount !== undefined && Number(selectedCourse.consultationCreditDiscount) > 0)
+    ? Number(selectedCourse.consultationCreditDiscount)
+    : defaultConsultationCredit;
+  const hasConsultationCredit = !isConsultationSelected && isSelectedCourseCreditAllowed && !!currentUser?.hasPaidConsultation && consultationCreditAmount > 0;
 
   const rawBaseFee = selectedCourse ? Number(selectedCourse.price) : 0;
   const effectiveBaseFee = hasConsultationCredit ? Math.max(0, rawBaseFee - consultationCreditAmount) : rawBaseFee;
@@ -424,17 +431,30 @@ function HomeContent() {
                 Select Your Program or Consultation
               </h2>
               <span style={{ fontSize: '12px', color: '#64748b' }}>
-                {visibleCourses.length} Available Option{visibleCourses.length === 1 ? '' : 's'}
+                {isLoadingCourses ? 'Loading...' : `${visibleCourses.length} Available Option${visibleCourses.length === 1 ? '' : 's'}`}
               </span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {visibleCourses.map((course) => {
+              {isLoadingCourses ? (
+                <div style={{ padding: '48px 24px', textAlign: 'center', color: '#64748b' }}>
+                  <Loader2 className="animate-spin" size={24} style={{ margin: '0 auto 12px' }} />
+                  <span style={{ fontSize: '13px' }}>Loading programs...</span>
+                </div>
+              ) : visibleCourses.length === 0 ? (
+                <div style={{ padding: '36px 20px', textAlign: 'center', color: '#64748b', border: '1px dashed #cbd5e1' }}>
+                  <span style={{ fontSize: '14px' }}>No programs currently available.</span>
+                </div>
+              ) : (
+                visibleCourses.map((course) => {
                 const isSelected = selectedCourseId === course.id;
                 const isCallConsultation = course.type === 'consultation' || course.id === 'call-consultation';
                 const hasPaidConsultation = !!currentUser?.hasPaidConsultation;
                 const isDisabled = !!course.disabled || (isCallConsultation && hasPaidConsultation);
-                const hasCredit = !isCallConsultation && hasPaidConsultation && consultationCreditAmount > 0;
+                const courseCreditDiscount = (course.consultationCreditDiscount !== undefined && Number(course.consultationCreditDiscount) > 0)
+                  ? Number(course.consultationCreditDiscount)
+                  : defaultConsultationCredit;
+                const hasCredit = !isCallConsultation && (course.allowConsultationCredit !== false) && hasPaidConsultation && courseCreditDiscount > 0;
 
                 return (
                   <div
@@ -563,16 +583,20 @@ function HomeContent() {
                           {hasCredit ? (
                             <>
                               <span style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>
-                                ₹{Math.max(0, Number(course.price) - consultationCreditAmount).toLocaleString('en-IN', { minimumFractionDigits: Number(course.price) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
+                                ₹{Math.max(0, Number(course.price) - courseCreditDiscount).toLocaleString('en-IN', { minimumFractionDigits: Number(course.price) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                               </span>
                               <span style={{ fontSize: '13px', color: '#94a3b8', textDecoration: 'line-through' }}>
                                 ₹{Number(course.price).toLocaleString('en-IN', { minimumFractionDigits: Number(course.price) % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                               </span>
-                              {course.originalPrice && (
-                                <span style={{ fontSize: '12px', color: '#cbd5e1', textDecoration: 'line-through' }}>
-                                  ₹{Number(course.originalPrice).toLocaleString('en-IN')}
-                                </span>
-                              )}
+                              <span style={{
+                                fontSize: '11px',
+                                color: '#15803d',
+                                fontWeight: 700,
+                                backgroundColor: 'rgba(21, 128, 61, 0.12)',
+                                padding: '2px 7px'
+                              }}>
+                                ₹{courseCreditDiscount.toLocaleString('en-IN')} Discovery Call Credit Applied
+                              </span>
                             </>
                           ) : (
                             <>
@@ -709,7 +733,7 @@ function HomeContent() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
 
@@ -721,7 +745,7 @@ function HomeContent() {
                   Enrollment Summary
                 </h3>
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                  {selectedCourse.title}
+                  {selectedCourse ? selectedCourse.title : (isLoadingCourses ? 'Loading program details...' : 'Select a program')}
                 </p>
               </div>
 
@@ -803,7 +827,7 @@ function HomeContent() {
                   fontSize: '13px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', marginBottom: '8px' }}>
-                    <span>{selectedCourse.title} Base Fee:</span>
+                    <span>{selectedCourse?.title || 'Program'} Base Fee:</span>
                     <span>₹{rawBaseFee.toLocaleString('en-IN', { minimumFractionDigits: rawBaseFee % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}</span>
                   </div>
 

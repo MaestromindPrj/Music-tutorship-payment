@@ -182,6 +182,7 @@ export async function adminUpdateUser(params: {
   password?: string;
   name?: string;
   allowedCourses?: string[];
+  hasPaidConsultation?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   const cleanEmail = params.email.trim().toLowerCase();
 
@@ -206,12 +207,14 @@ export async function adminUpdateUser(params: {
   await neonUpdateUser(cleanEmail, {
     password: hashedPassword,
     name: params.name?.trim(),
-    allowedCourses: params.allowedCourses
+    allowedCourses: params.allowedCourses,
+    hasPaidConsultation: params.hasPaidConsultation
   });
 
   if (hashedPassword) existing.password = hashedPassword;
   if (params.name) existing.name = params.name.trim();
   if (params.allowedCourses !== undefined) existing.allowedCourses = params.allowedCourses;
+  if (params.hasPaidConsultation !== undefined) existing.hasPaidConsultation = Boolean(params.hasPaidConsultation);
   userStore.set(cleanEmail, existing);
 
   return { success: true };

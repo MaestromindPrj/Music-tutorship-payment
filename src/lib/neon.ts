@@ -287,6 +287,8 @@ export async function initDb(): Promise<{ success: boolean; message: string }> {
     await sql`CREATE INDEX IF NOT EXISTS idx_registrations_txnid ON registrations(txnid);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_password_reset_otps_email ON password_reset_otps(email);`;
+    await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS allow_consultation_credit BOOLEAN DEFAULT TRUE;`;
+    await sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS consultation_credit_discount NUMERIC(10, 2);`;
 
     dbInitialized = true;
     return { success: true, message: 'Neon PostgreSQL schema initialized successfully.' };
@@ -379,7 +381,7 @@ export async function neonUpdateUserLastLogin(email: string): Promise<void> {
 
 export async function neonUpdateUser(
   email: string,
-  updates: { password?: string; name?: string; allowedCourses?: string[] }
+  updates: { password?: string; name?: string; allowedCourses?: string[]; hasPaidConsultation?: boolean }
 ): Promise<boolean> {
   const sql = getNeonSql();
   if (!sql) return false;
@@ -390,6 +392,13 @@ export async function neonUpdateUser(
     await sql`
       UPDATE users
       SET allowed_courses = ${updates.allowedCourses}, updated_at = NOW()
+      WHERE email = ${cleanEmail};
+    `;
+  }
+  if (updates.hasPaidConsultation !== undefined) {
+    await sql`
+      UPDATE users
+      SET has_paid_consultation = ${Boolean(updates.hasPaidConsultation)}, updated_at = NOW()
       WHERE email = ${cleanEmail};
     `;
   }
@@ -1062,7 +1071,7 @@ export async function neonGetAllCourses(): Promise<Course[]> {
   await ensureDbInitialized();
 
   const rows = await sql`
-    SELECT id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, created_at, updated_at
+    SELECT id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, allow_consultation_credit, consultation_credit_discount, created_at, updated_at
     FROM courses
     ORDER BY order_index ASC, created_at ASC;
   `;
@@ -1083,6 +1092,8 @@ export async function neonGetAllCourses(): Promise<Course[]> {
     popular: Boolean(r.popular),
     disabled: Boolean(r.disabled),
     orderIndex: r.order_index ? Number(r.order_index) : 0,
+    allowConsultationCredit: r.allow_consultation_credit !== null && r.allow_consultation_credit !== undefined ? Boolean(r.allow_consultation_credit) : true,
+    consultationCreditDiscount: r.consultation_credit_discount !== null && r.consultation_credit_discount !== undefined ? Number(r.consultation_credit_discount) : undefined,
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : undefined,
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined
   }));
@@ -1094,7 +1105,7 @@ export async function neonGetCourseById(id: string): Promise<Course | null> {
   await ensureDbInitialized();
 
   const rows = await sql`
-    SELECT id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, created_at, updated_at
+    SELECT id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, allow_consultation_credit, consultation_credit_discount, created_at, updated_at
     FROM courses
     WHERE id = ${id}
     LIMIT 1;
@@ -1130,7 +1141,7 @@ export async function neonSaveCourse(course: Course): Promise<boolean> {
 
   await sql`
     INSERT INTO courses (
-      id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, created_at, updated_at
+      id, title, subtitle, tag, badge, price, original_price, duration, batch_size, features, type, tax_rate, popular, disabled, order_index, allow_consultation_credit, consultation_credit_discount, created_at, updated_at
     ) VALUES (
       ${course.id},
       ${course.title},
@@ -1147,6 +1158,8 @@ export async function neonSaveCourse(course: Course): Promise<boolean> {
       ${Boolean(course.popular)},
       ${Boolean(course.disabled)},
       ${course.orderIndex || 0},
+      ${course.allowConsultationCredit !== undefined ? Boolean(course.allowConsultationCredit) : true},
+      ${course.consultationCreditDiscount !== undefined && course.consultationCreditDiscount !== null ? Number(course.consultationCreditDiscount) : null},
       NOW(),
       NOW()
     )
@@ -1165,6 +1178,8 @@ export async function neonSaveCourse(course: Course): Promise<boolean> {
       popular = EXCLUDED.popular,
       disabled = EXCLUDED.disabled,
       order_index = EXCLUDED.order_index,
+      allow_consultation_credit = EXCLUDED.allow_consultation_credit,
+      consultation_credit_discount = EXCLUDED.consultation_credit_discount,
       updated_at = NOW();
   `;
   return true;

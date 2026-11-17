@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPayUConfig, generatePayUHash, generateTxnId } from '@/lib/payu';
 import { neonGetCourseById, neonGetAllCourses } from '@/lib/neon';
-import { getCourseById } from '@/lib/courses';
 import { savePayment } from '@/lib/db';
 import { hasUserPaidConsultation } from '@/lib/auth';
 import { PayUInitiatePayload, PayUFormData } from '@/types';
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const course = (await neonGetCourseById(courseId).catch(() => null)) || getCourseById(courseId);
+    const course = await neonGetCourseById(courseId).catch(() => null);
     
     const hasConsultationCredit = await hasUserPaidConsultation(cleanEmail);
 
@@ -33,11 +32,18 @@ export async function POST(req: NextRequest) {
     const isCallConsultation = courseId === 'call-consultation' || course?.type === 'consultation';
     let basePrice = course ? Number(course.price) : (customAmount || 0);
 
-    if (!isCallConsultation && hasConsultationCredit) {
+    const isCreditEligible = !isCallConsultation && hasConsultationCredit && (course?.allowConsultationCredit !== false);
+
+    if (isCreditEligible) {
       try {
-        const allCourses = await neonGetAllCourses();
-        const consultCourse = allCourses.find((c) => c.type === 'consultation' || c.id === 'call-consultation');
-        const creditAmount = consultCourse ? Number(consultCourse.price) : 0;
+        let creditAmount = 0;
+        if (course?.consultationCreditDiscount !== undefined && Number(course.consultationCreditDiscount) > 0) {
+          creditAmount = Number(course.consultationCreditDiscount);
+        } else {
+          const allCourses = await neonGetAllCourses();
+          const consultCourse = allCourses.find((c) => c.type === 'consultation' || c.id === 'call-consultation');
+          creditAmount = consultCourse ? Number(consultCourse.price) : 0;
+        }
         basePrice = Math.max(0, basePrice - creditAmount);
       } catch (e) {
       }

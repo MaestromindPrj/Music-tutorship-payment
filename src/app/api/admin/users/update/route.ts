@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, name, allowedCourses } = body;
+    const { email, password, name, allowedCourses, hasPaidConsultation } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!password && !name && allowedCourses === undefined) {
+    if (!password && !name && allowedCourses === undefined && hasPaidConsultation === undefined) {
       return NextResponse.json(
-        { error: 'Provide at least a new password, name, or options to update' },
+        { error: 'Provide at least a new password, name, options, or consultation status to update' },
         { status: 400 }
       );
     }
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
       email,
       password,
       name,
-      allowedCourses: Array.isArray(allowedCourses) ? allowedCourses : undefined
+      allowedCourses: Array.isArray(allowedCourses) ? allowedCourses : undefined,
+      hasPaidConsultation: hasPaidConsultation !== undefined ? Boolean(hasPaidConsultation) : undefined
     });
 
     if (!result.success) {

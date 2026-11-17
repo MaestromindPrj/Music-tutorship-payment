@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAdminAuth } from '@/lib/adminAuth';
 import { neonGetAllCourses, neonSaveCourse, neonUpdateCourse, neonDeleteCourse } from '@/lib/neon';
-import { getCourses } from '@/lib/courses';
 import { Course } from '@/types';
 
 export async function GET(req: NextRequest) {
@@ -9,11 +8,8 @@ export async function GET(req: NextRequest) {
     const isAuthed = checkAdminAuth(req);
     if (!isAuthed) return NextResponse.json({ error: 'Unauthorized: Admin authentication required' }, { status: 401 });
 
-    let list = await neonGetAllCourses();
-    if (!list || list.length === 0) {
-      list = getCourses();
-    }
-    return NextResponse.json({ success: true, courses: list });
+    const list = await neonGetAllCourses();
+    return NextResponse.json({ success: true, courses: list || [] });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to fetch courses' }, { status: 500 });
   }
@@ -46,7 +42,9 @@ export async function POST(req: NextRequest) {
       taxRate: body.taxRate !== undefined ? Number(body.taxRate) : (body.type === 'consultation' ? 0 : 0.18),
       popular: Boolean(body.popular),
       disabled: Boolean(body.disabled),
-      orderIndex: body.orderIndex ? Number(body.orderIndex) : 0
+      orderIndex: body.orderIndex ? Number(body.orderIndex) : 0,
+      allowConsultationCredit: body.allowConsultationCredit !== undefined ? Boolean(body.allowConsultationCredit) : true,
+      consultationCreditDiscount: body.consultationCreditDiscount !== undefined && body.consultationCreditDiscount !== '' && body.consultationCreditDiscount !== null ? Number(body.consultationCreditDiscount) : undefined
     };
 
     await neonSaveCourse(newCourse);
@@ -81,6 +79,8 @@ export async function PUT(req: NextRequest) {
     if (body.popular !== undefined) updates.popular = Boolean(body.popular);
     if (body.disabled !== undefined) updates.disabled = Boolean(body.disabled);
     if (body.orderIndex !== undefined) updates.orderIndex = Number(body.orderIndex);
+    if (body.allowConsultationCredit !== undefined) updates.allowConsultationCredit = Boolean(body.allowConsultationCredit);
+    if (body.consultationCreditDiscount !== undefined) updates.consultationCreditDiscount = body.consultationCreditDiscount !== '' && body.consultationCreditDiscount !== null ? Number(body.consultationCreditDiscount) : undefined;
 
     await neonUpdateCourse(id, updates);
     return NextResponse.json({ success: true, message: 'Course updated successfully' });

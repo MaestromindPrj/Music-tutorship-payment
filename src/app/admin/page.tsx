@@ -123,6 +123,8 @@ export default function AdminPage() {
   const [courseFormDisabled, setCourseFormDisabled] = useState(false);
   const [isSavingCourse, setIsSavingCourse] = useState(false);
   const [courseFormError, setCourseFormError] = useState('');
+  const [courseFormAllowConsultationCredit, setCourseFormAllowConsultationCredit] = useState(true);
+  const [courseFormConsultationCreditDiscount, setCourseFormConsultationCreditDiscount] = useState<number | string>('');
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [addUserError, setAddUserError] = useState('');
   const [createdUserSuccess, setCreatedUserSuccess] = useState<{
@@ -134,6 +136,7 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<{ id: string; name: string; email: string } | null>(null);
   const [editName, setEditName] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [editHasPaidConsultation, setEditHasPaidConsultation] = useState(false);
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
   const [editUserError, setEditUserError] = useState('');
   const [editUserSuccess, setEditUserSuccess] = useState<{
@@ -273,7 +276,9 @@ export default function AdminPage() {
         type: courseFormType,
         taxRate: Number(courseFormTaxRate),
         popular: courseFormPopular,
-        disabled: courseFormDisabled
+        disabled: courseFormDisabled,
+        allowConsultationCredit: courseFormAllowConsultationCredit,
+        consultationCreditDiscount: courseFormConsultationCreditDiscount !== '' ? Number(courseFormConsultationCreditDiscount) : undefined
       };
 
       const res = await fetch('/api/admin/courses', {
@@ -370,7 +375,8 @@ export default function AdminPage() {
           email: editingUser.email,
           password: editPassword || undefined,
           name: editName.trim() || undefined,
-          allowedCourses: editAllowedCourses
+          allowedCourses: editAllowedCourses,
+          hasPaidConsultation: editHasPaidConsultation
         })
       });
       const data = await res.json();
@@ -1426,26 +1432,37 @@ export default function AdminPage() {
                           </td>
 
                           <td style={{ padding: '16px 18px', whiteSpace: 'nowrap' }}>
-                            {u.hasPaidConsultation ? (
-                              <span style={{
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const newStatus = !u.hasPaidConsultation;
+                                try {
+                                  await fetch('/api/admin/users/update', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ email: u.email, hasPaidConsultation: newStatus })
+                                  });
+                                  fetchDashboardData();
+                                } catch (e) {}
+                              }}
+                              style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
-                                padding: '3px 8px',
-                                backgroundColor: 'rgba(234, 179, 8, 0.12)',
-                                color: '#854d0e',
+                                padding: '4px 10px',
+                                backgroundColor: u.hasPaidConsultation ? 'rgba(234, 179, 8, 0.12)' : '#f8fafc',
+                                color: u.hasPaidConsultation ? '#854d0e' : '#64748b',
+                                border: u.hasPaidConsultation ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid #cbd5e1',
                                 fontSize: '11px',
                                 fontWeight: 700,
+                                cursor: 'pointer',
                                 whiteSpace: 'nowrap'
-                              }}>
-                                <Sparkles size={11} />
-                                <span>Paid (Credit Active)</span>
-                              </span>
-                            ) : (
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
-                                Standard Account
-                              </span>
-                            )}
+                              }}
+                              title={u.hasPaidConsultation ? 'Click to revoke credit' : 'Click to grant credit'}
+                            >
+                              <Sparkles size={11} />
+                              <span>{u.hasPaidConsultation ? 'Paid & Booked (Click to Revoke)' : 'Not Paid (Click to Grant)'}</span>
+                            </button>
                           </td>
 
                           <td style={{ padding: '16px 18px', minWidth: '200px' }}>
@@ -1494,6 +1511,7 @@ export default function AdminPage() {
                                 setEditingUser({ id: u.id, name: u.name, email: u.email });
                                 setEditName(u.name || '');
                                 setEditPassword('');
+                                setEditHasPaidConsultation(Boolean(u.hasPaidConsultation));
                                 setEditAllowedCourses(Array.isArray(u.allowedCourses) && u.allowedCourses.length > 0 ? u.allowedCourses : coursesList.map(c => c.id));
                                 setEditUserError('');
                                 setEditUserSuccess(null);
@@ -1548,6 +1566,8 @@ export default function AdminPage() {
                     setCourseFormFeatures('');
                     setCourseFormPopular(false);
                     setCourseFormDisabled(false);
+                    setCourseFormAllowConsultationCredit(true);
+                    setCourseFormConsultationCreditDiscount('');
                     setCourseFormError('');
                     setIsCourseModalOpen(true);
                   }}
@@ -1640,6 +1660,8 @@ export default function AdminPage() {
                           setCourseFormFeatures(Array.isArray(c.features) ? c.features.join('\n') : '');
                           setCourseFormPopular(Boolean(c.popular));
                           setCourseFormDisabled(Boolean(c.disabled));
+                          setCourseFormAllowConsultationCredit(c.allowConsultationCredit !== false);
+                          setCourseFormConsultationCreditDiscount(c.consultationCreditDiscount !== undefined ? c.consultationCreditDiscount : '');
                           setCourseFormError('');
                           setIsCourseModalOpen(true);
                         }}
@@ -1913,6 +1935,20 @@ export default function AdminPage() {
                     onChange={(e) => setNewUserPassword(e.target.value)}
                     style={{ marginTop: '6px', marginBottom: '14px' }}
                   />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                    <input
+                      type="checkbox"
+                      checked={editHasPaidConsultation}
+                      onChange={(e) => setEditHasPaidConsultation(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
+                    />
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      Discovery Call Paid (Eligible for Call Fee Deduction)
+                    </span>
+                  </label>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '16px' }}>
@@ -2421,6 +2457,37 @@ export default function AdminPage() {
                   </select>
                 </div>
               </div>
+
+              {courseFormType !== 'consultation' && (
+                <div style={{ padding: '14px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: courseFormAllowConsultationCredit ? '10px' : 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={courseFormAllowConsultationCredit}
+                      onChange={(e) => setCourseFormAllowConsultationCredit(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                      Allow Discovery Call Fee Deduction
+                    </span>
+                  </label>
+                  {courseFormAllowConsultationCredit && (
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label" style={{ fontSize: '11px', marginBottom: '4px' }}>
+                        <span>Deduction Amount (₹) — Leave empty to auto-match Discovery Call fee</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="form-input"
+                        placeholder="10000"
+                        value={courseFormConsultationCreditDiscount}
+                        onChange={(e) => setCourseFormConsultationCreditDiscount(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="form-group" style={{ marginBottom: '12px' }}>
                 <label className="form-label"><span>Features (one per line)</span></label>

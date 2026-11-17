@@ -15,6 +15,8 @@ export interface Course {
   orderIndex?: number;
   popular?: boolean;
   disabled?: boolean;
+  allowConsultationCredit?: boolean;
+  consultationCreditDiscount?: number;
   createdAt?: string;
   updatedAt?: string;
 }

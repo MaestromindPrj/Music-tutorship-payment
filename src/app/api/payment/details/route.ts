@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPaymentByTxnId, getRegistrationByTxnId } from '@/lib/db';
-import { getCourseById } from '@/lib/courses';
+import { neonGetCourseById } from '@/lib/neon';
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     }
 
     const registration = await getRegistrationByTxnId(txnid);
-    const course = getCourseById(payment.courseId);
+    const course = await neonGetCourseById(payment.courseId).catch(() => null);
 
     const { payuHash, ...safePayment } = payment;
 
