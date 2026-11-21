@@ -154,17 +154,39 @@ function HomeContent() {
   const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(true);
 
   useEffect(() => {
-    fetch('/api/courses')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.courses)) {
-          setCourses(data.courses);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setIsLoadingCourses(false);
-      });
+    let isMounted = true;
+    const fetchCoursesData = () => {
+      fetch(`/api/courses?_t=${Date.now()}`, { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (isMounted && data.success && Array.isArray(data.courses)) {
+            setCourses(data.courses);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (isMounted) setIsLoadingCourses(false);
+        });
+    };
+
+    fetchCoursesData();
+
+    const onRecheck = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCoursesData();
+      }
+    };
+
+    window.addEventListener('focus', onRecheck);
+    document.addEventListener('visibilitychange', onRecheck);
+    const interval = setInterval(fetchCoursesData, 15000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('focus', onRecheck);
+      document.removeEventListener('visibilitychange', onRecheck);
+      clearInterval(interval);
+    };
   }, []);
 
   const statusParam = searchParams.get('status');
@@ -172,37 +194,42 @@ function HomeContent() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const syncUser = async () => {
       try {
         const stored = localStorage.getItem('mt_user');
         if (stored) {
           const parsed = JSON.parse(stored);
-          setCurrentUser(parsed);
+          if (isMounted) setCurrentUser(parsed);
           if (parsed.email) {
-            setEmail(parsed.email);
-            if (parsed.name && !studentName) {
-              setStudentName(parsed.name);
+            if (isMounted) {
+              setEmail(parsed.email);
+              if (parsed.name && !studentName) {
+                setStudentName(parsed.name);
+              }
             }
 
             try {
-              const res = await fetch(`/api/auth/consultation-status?email=${encodeURIComponent(parsed.email)}`);
+              const res = await fetch(`/api/auth/consultation-status?email=${encodeURIComponent(parsed.email)}&_t=${Date.now()}`, {
+                cache: 'no-store'
+              });
               const data = await res.json();
-              const hasPaidDiff = data.hasPaidConsultation !== parsed.hasPaidConsultation;
+              const hasPaidDiff = Boolean(data.hasPaidConsultation) !== Boolean(parsed.hasPaidConsultation);
               const allowedDiff = data.allowedCourses && JSON.stringify(data.allowedCourses) !== JSON.stringify(parsed.allowedCourses);
               if (hasPaidDiff || allowedDiff) {
                 const updated = {
                   ...parsed,
-                  hasPaidConsultation: !!data.hasPaidConsultation,
+                  hasPaidConsultation: Boolean(data.hasPaidConsultation),
                   allowedCourses: Array.isArray(data.allowedCourses) ? data.allowedCourses : (parsed.allowedCourses || [])
                 };
-                setCurrentUser(updated);
+                if (isMounted) setCurrentUser(updated);
                 localStorage.setItem('mt_user', JSON.stringify(updated));
               }
             } catch (e) {
             }
           }
         } else {
-          setCurrentUser(null);
+          if (isMounted) setCurrentUser(null);
         }
       } catch (e) {
       }
@@ -211,11 +238,25 @@ function HomeContent() {
     syncUser();
     window.addEventListener('auth-change', syncUser);
     window.addEventListener('storage', syncUser);
+
+    const onRecheck = () => {
+      if (document.visibilityState === 'visible') {
+        syncUser();
+      }
+    };
+    window.addEventListener('focus', onRecheck);
+    document.addEventListener('visibilitychange', onRecheck);
+    const interval = setInterval(syncUser, 15000);
+
     return () => {
+      isMounted = false;
       window.removeEventListener('auth-change', syncUser);
       window.removeEventListener('storage', syncUser);
+      window.removeEventListener('focus', onRecheck);
+      document.removeEventListener('visibilitychange', onRecheck);
+      clearInterval(interval);
     };
-  }, []);
+  }, [studentName]);
 
   const visibleCourses = useMemo(() => {
     if (!currentUser || !currentUser.allowedCourses || currentUser.allowedCourses.length === 0) {

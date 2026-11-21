@@ -6,7 +6,8 @@ import {
   neonUpdateUserPassword,
   neonMarkConsultationPaid,
   neonGetAllUsers,
-  neonUpdateUserLastLogin
+  neonUpdateUserLastLogin,
+  neonDeleteUser
 } from './neon';
 
 export interface UserAccount {
@@ -112,8 +113,6 @@ export function validatePassword(password: string): { isValid: boolean; error?: 
 
 export async function findUserByEmail(email: string): Promise<UserAccount | undefined> {
   const cleanEmail = email.trim().toLowerCase();
-  const cached = userStore.get(cleanEmail);
-  if (cached) return cached;
 
   const dbUser = await neonFindUserByEmail(cleanEmail).catch((e) => {
     console.warn('Neon findUserByEmail note:', e);
@@ -124,9 +123,14 @@ export async function findUserByEmail(email: string): Promise<UserAccount | unde
     userStore.set(cleanEmail, dbUser);
     if (dbUser.hasPaidConsultation) {
       consultationPaidEmails.add(cleanEmail);
+    } else {
+      consultationPaidEmails.delete(cleanEmail);
     }
     return dbUser;
   }
+
+  const cached = userStore.get(cleanEmail);
+  if (cached) return cached;
 
   return undefined;
 }
@@ -220,6 +224,14 @@ export async function adminUpdateUser(params: {
   return { success: true };
 }
 
+export async function adminDeleteUser(email: string): Promise<{ success: boolean; error?: string }> {
+  const cleanEmail = email.trim().toLowerCase();
+  await neonDeleteUser(cleanEmail);
+  userStore.delete(cleanEmail);
+  consultationPaidEmails.delete(cleanEmail);
+  return { success: true };
+}
+
 export async function registerUser(
   email: string,
   password: string,
@@ -255,9 +267,7 @@ export async function authenticateUser(
     await neonUpdateUserPassword(cleanEmail, upgradedHash).catch(() => {});
   }
 
-  if (consultationPaidEmails.has(cleanEmail)) {
-    existing.hasPaidConsultation = true;
-  }
+
 
   await neonUpdateUserLastLogin(cleanEmail).catch((e) =>
     console.warn('neonUpdateUserLastLogin note:', e)
@@ -280,10 +290,11 @@ export async function markConsultationPaid(email: string): Promise<void> {
 
 export async function hasUserPaidConsultation(email: string): Promise<boolean> {
   const cleanEmail = email.trim().toLowerCase();
-  if (consultationPaidEmails.has(cleanEmail)) return true;
-
   const existing = await findUserByEmail(cleanEmail);
-  return !!existing?.hasPaidConsultation;
+  if (existing) {
+    return Boolean(existing.hasPaidConsultation);
+  }
+  return consultationPaidEmails.has(cleanEmail);
 }
 
 export async function getAllUsersForAdmin(): Promise<Array<{

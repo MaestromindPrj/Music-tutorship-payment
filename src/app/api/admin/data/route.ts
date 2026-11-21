@@ -8,6 +8,9 @@ import {
 import { getAllUsersForAdmin } from '@/lib/auth';
 import { neonGetAllCourses, getDatabaseUrl } from '@/lib/neon';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   try {
     const isAuthed = checkAdminAuth(req);
@@ -25,20 +28,32 @@ export async function GET(req: NextRequest) {
 
     const isConnectedToNeon = !!getDatabaseUrl();
 
-    return NextResponse.json({
-      success: true,
-      neonConnected: isConnectedToNeon,
-      stats,
-      payments,
-      registrations,
-      users,
-      courses
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        neonConnected: isConnectedToNeon,
+        stats,
+        payments,
+        registrations,
+        users,
+        courses
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0'
+        }
+      }
+    );
   } catch (error: any) {
     console.error('Admin data fetch error:', error);
     return NextResponse.json(
       { error: error?.message || 'Failed to fetch admin data' },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0'
+        }
+      }
     );
   }
 }

@@ -483,6 +483,23 @@ export async function neonGetAllUsers(): Promise<Array<{
 }
 
 
+export async function neonDeleteUser(email: string): Promise<boolean> {
+  const sql = getNeonSql();
+  if (!sql) return false;
+  await ensureDbInitialized();
+
+  const cleanEmail = email.trim().toLowerCase();
+  await sql`
+    DELETE FROM password_reset_otps
+    WHERE email = ${cleanEmail};
+  `;
+  await sql`
+    DELETE FROM users
+    WHERE email = ${cleanEmail};
+  `;
+  return true;
+}
+
 export async function neonSaveOtp(email: string, otpCode: string, expiresAt: Date): Promise<boolean> {
   const sql = getNeonSql();
   if (!sql) return false;

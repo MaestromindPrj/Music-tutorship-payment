@@ -213,7 +213,7 @@ export default function AuthModal({
               Accounts are created by the administrator. Credentials are provided via WhatsApp upon enrollment.
             </p>
             <a
-              href="https://wa.me/919944634458?text=Hello%2C%20I%20need%20my%20Music%20Tutorship%20login%20credentials."
+              href="https://wa.me/916374428173?text=Hello%2C%20I%20need%20my%20Music%20Tutorship%20login%20credentials."
               target="_blank"
               rel="noopener noreferrer"
               style={{

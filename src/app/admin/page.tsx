@@ -104,6 +104,7 @@ export default function AdminPage() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserAllowedCourses, setNewUserAllowedCourses] = useState<string[]>([]);
+  const [newUserHasPaidConsultation, setNewUserHasPaidConsultation] = useState(false);
   const [editAllowedCourses, setEditAllowedCourses] = useState<string[]>([]);
 
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
@@ -214,7 +215,7 @@ export default function AdminPage() {
   const fetchDashboardData = async () => {
     setIsLoadingData(true);
     try {
-      const res = await fetch('/api/admin/data');
+      const res = await fetch(`/api/admin/data?_t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data.stats) setStats(data.stats);
@@ -323,7 +324,7 @@ export default function AdminPage() {
           name: newUserName.trim() || newUserEmail.split('@')[0],
           email: newUserEmail.trim().toLowerCase(),
           password: newUserPassword,
-          hasPaidConsultation: false,
+          hasPaidConsultation: newUserHasPaidConsultation,
           allowedCourses: newUserAllowedCourses
         })
       });
@@ -1506,33 +1507,74 @@ export default function AdminPage() {
                           </td>
 
                           <td style={{ padding: '16px 18px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <button
-                              onClick={() => {
-                                setEditingUser({ id: u.id, name: u.name, email: u.email });
-                                setEditName(u.name || '');
-                                setEditPassword('');
-                                setEditHasPaidConsultation(Boolean(u.hasPaidConsultation));
-                                setEditAllowedCourses(Array.isArray(u.allowedCourses) && u.allowedCourses.length > 0 ? u.allowedCourses : coursesList.map(c => c.id));
-                                setEditUserError('');
-                                setEditUserSuccess(null);
-                              }}
-                              style={{
-                                padding: '6px 12px',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                backgroundColor: '#ffffff',
-                                color: '#0f172a',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '0px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px'
-                              }}
-                            >
-                              <Key size={12} style={{ color: '#b8871b' }} />
-                              <span>Edit Access & Pass</span>
-                            </button>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                onClick={() => {
+                                  setEditingUser({ id: u.id, name: u.name, email: u.email });
+                                  setEditName(u.name || '');
+                                  setEditPassword('');
+                                  setEditHasPaidConsultation(Boolean(u.hasPaidConsultation));
+                                  setEditAllowedCourses(Array.isArray(u.allowedCourses) && u.allowedCourses.length > 0 ? u.allowedCourses : coursesList.map(c => c.id));
+                                  setEditUserError('');
+                                  setEditUserSuccess(null);
+                                }}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  backgroundColor: '#ffffff',
+                                  color: '#0f172a',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '0px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}
+                                title="Edit Access & Pass"
+                              >
+                                <Key size={12} style={{ color: '#b8871b' }} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!window.confirm(`Are you sure you want to permanently delete user "${u.name || u.email}"?`)) return;
+                                  try {
+                                    const res = await fetch('/api/admin/users/delete', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ email: u.email })
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok && data.success) {
+                                      fetchDashboardData();
+                                    } else {
+                                      alert(data.error || 'Failed to delete user');
+                                    }
+                                  } catch {
+                                    alert('Failed to delete user');
+                                  }
+                                }}
+                                style={{
+                                  padding: '6px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  backgroundColor: 'rgba(185, 28, 28, 0.08)',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: '0px',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Delete User"
+                              >
+                                <Trash2 size={12} />
+                                <span>Delete</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1847,6 +1889,7 @@ export default function AdminPage() {
                       setCreatedUserSuccess(null);
                       setNewUserName('');
                       setNewUserEmail('');
+                      setNewUserHasPaidConsultation(false);
                       generateRandomPassword();
                     }}
                     className="btn-primary"
@@ -1937,12 +1980,14 @@ export default function AdminPage() {
                   />
                 </div>
 
+
+
                 <div className="form-group" style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
                     <input
                       type="checkbox"
-                      checked={editHasPaidConsultation}
-                      onChange={(e) => setEditHasPaidConsultation(e.target.checked)}
+                      checked={newUserHasPaidConsultation}
+                      onChange={(e) => setNewUserHasPaidConsultation(e.target.checked)}
                       style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
                     />
                     <span style={{ fontWeight: 700, color: '#0f172a' }}>
@@ -2211,6 +2256,20 @@ export default function AdminPage() {
                     onChange={(e) => setEditPassword(e.target.value)}
                     style={{ marginTop: '6px' }}
                   />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                    <input
+                      type="checkbox"
+                      checked={editHasPaidConsultation}
+                      onChange={(e) => setEditHasPaidConsultation(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
+                    />
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      Discovery Call Paid (Eligible for Call Fee Deduction)
+                    </span>
+                  </label>
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '16px' }}>
