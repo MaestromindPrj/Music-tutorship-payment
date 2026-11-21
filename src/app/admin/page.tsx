@@ -1991,7 +1991,7 @@ export default function AdminPage() {
                       style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
                     />
                     <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                      Discovery Call Paid (Eligible for Call Fee Deduction)
+                      Discovery Call Already Paid (Eligible for Call Fee Deduction)
                     </span>
                   </label>
                 </div>
@@ -2267,7 +2267,7 @@ export default function AdminPage() {
                       style={{ width: '16px', height: '16px', accentColor: '#b8871b' }}
                     />
                     <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                      Discovery Call Paid (Eligible for Call Fee Deduction)
+                      Discovery Call Already Paid (Eligible for Call Fee Deduction)
                     </span>
                   </label>
                 </div>
